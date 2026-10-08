@@ -16,9 +16,9 @@
     var el = A.$('#savedInd'); if (el) el.textContent = (c.number ? 'Změny uloženy ' : 'Koncept uložen ') + A.fmtTime(c.updatedAt);
   }
   function stepErrors(c, s) {
-    if (s === 1) return c.job.name.trim() ? {} : { name: 'Zadejte název zakázky' };
-    if (s === 2) { var e = {}; c.groups.forEach(function (g, i) { var ge = Calc.validateGroup(g); if (Object.keys(ge).length) e[i] = ge; }); return e; }
-    if (s === 3) return c.patternId ? {} : { pattern: 'Vyberte jeden vzor' };
+    if (s === 1) { var e = {}; c.groups.forEach(function (g, i) { var ge = Calc.validateGroup(g); if (Object.keys(ge).length) e[i] = ge; }); return e; }
+    if (s === 2) return c.patternId ? {} : { pattern: 'Vyberte jeden vzor' };
+    if (s === 3) return c.job.name.trim() ? {} : { name: 'Zadejte název zakázky' };
     return {};
   }
   function allValid(c) { return [1, 2, 3].every(function (s) { return !Object.keys(stepErrors(c, s)).length; }); }
@@ -51,11 +51,12 @@
   /* ---------- nová kalkulace ---------- */
   A.route('/new', 'user', function (p, user) {
     W.pending = Store.newCalc(user);
+    W.pending.job.name = 'Kalkulace ' + A.fmtDate(Date.now());
     location.replace('#/wizard/' + W.pending.id + '/1');
   });
 
   /* ---------- průvodce ---------- */
-  var LABELS = ['Zakázka', 'Schody', 'Vzor', 'Kalkulace'];
+  var LABELS = ['Schody', 'Vzor', 'Zakázka', 'Kalkulace'];
   A.route('/wizard/:id/:step', 'user', function (p, user) {
     var c = loadCalc(p.id, user); if (!c) return;
     if (ro(c)) return A.go('/calc/' + c.id);
@@ -67,9 +68,9 @@
     var saved = Store.calcById(c.id) ? (c.number ? 'Změny uloženy ' : 'Koncept uložen ') + A.fmtTime(c.updatedAt) : 'Zatím neuloženo';
     var head = '<div class="wiz-head"><div class="t"><span>Krok ' + s + ' ze 4 · <b>' + LABELS[s - 1] + '</b></span></div>' +
       '<div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="4" aria-valuenow="' + s + '" aria-label="Postup"><i style="width:' + (s * 25) + '%"></i></div></div>';
-    var body = s === 1 ? step1(c) : s === 2 ? step2(c) : s === 3 ? step3(c) : calcBody(c, true);
+    var body = s === 1 ? stepStairs(c) : s === 2 ? stepPattern(c) : s === 3 ? stepJob(c) : calcBody(c, true);
     A.render(head + (s < 4 ? priceNotice(c) : '') + body, { title: c.number ? 'Úprava kalkulace' : 'Nová kalkulace', back: '#/history', saved: saved, bar: actionBar(c, s) });
-    if (s >= 2) barUpdate();
+    barUpdate();
     if (W.showErrors) { W.showErrors = false; showStepErrors(c, s); }
   });
   function goStep(n) {
@@ -94,7 +95,7 @@
     return href ? '<a class="btn sq" href="' + href + '" aria-label="Zpět">' + ic('back', 'lg') + '</a>' : '<button class="btn sq" data-click="back" aria-label="Zpět">' + ic('back', 'lg') + '</button>';
   }
   function actionBar(c, s) {
-    var inner = (s >= 2 ? priceRow() : '') + '<div class="btns">' + backBtn() +
+    var inner = priceRow() + '<div class="btns">' + backBtn() +
       (s === 4 ? '<button class="btn sq" data-click="moreSheet" aria-label="Další akce">' + ic('more', 'lg') + '</button><button class="btn primary" data-click="saveCalc">Uložit</button>'
         : '<button class="btn primary" data-click="next">Dál</button>') + '</div>';
     return '<div class="actionbar stickybar"><div class="inner">' + inner + '</div></div>';
@@ -108,8 +109,8 @@
 
   function showStepErrors(c, s) {
     var e = stepErrors(c, s);
-    if (s === 1) A.setErr(A.$('[name=name]'), e.name || '');
-    if (s === 2) {
+    if (s === 3) A.setErr(A.$('[name=name]'), e.name || '');
+    if (s === 1) {
       c.groups.forEach(function (g, i) {
         ['width', 'depth', 'riserHeight', 'count'].forEach(function (f) {
           var el = A.$('[data-g="' + i + '"][data-f="' + f + '"]'); if (el) A.setErr(el, (e[i] || {})[f] || '');
@@ -117,13 +118,13 @@
         if (e[i]) { var card = A.$('[data-gcard="' + i + '"]'); if (card) { card.classList.remove('collapsed'); delete W.folded[i]; } }
       });
     }
-    if (s === 3) { var pe = A.$('#patErr'); if (pe) pe.textContent = e.pattern || ''; }
+    if (s === 2) { var pe =A.$('#patErr'); if (pe) pe.textContent = e.pattern || ''; }
   }
 
-  /* krok 1 */
-  function step1(c) {
+  /* krok 3: zakázka */
+  function stepJob(c) {
     var j = c.job;
-    return '<h1 class="wiz-title">Zakázka</h1><p class="lead-text">Základní údaje, které se objeví na kalkulaci.</p><div class="card">' +
+    return '<h1 class="wiz-title">Zakázka</h1><p class="lead-text">Údaje pro kalkulaci a PDF. Název je předvyplněný, stačí přepsat.</p><div class="card">' +
       '<div class="field"><label for="jn">Název zakázky *</label><input type="text" id="jn" name="name" value="' + esc(j.name) + '" data-input="job" data-f="name" data-blur="jobBlur" placeholder="např. Rodinný dům Novákovi" autocomplete="off"><div class="err"></div></div>' +
       '<div class="field"><label for="jc">Zákazník <span class="opt">(volitelné)</span></label><input type="text" id="jc" value="' + esc(j.customer) + '" data-input="job" data-f="customer" autocomplete="off"></div>' +
       '<div class="field"><label for="ja">Adresa <span class="opt">(volitelné)</span></label><input type="text" id="ja" value="' + esc(j.address) + '" data-input="job" data-f="address" autocomplete="off"></div>' +
@@ -136,7 +137,7 @@
   });
   A.on('blur', 'jobBlur', function (el) { A.setErr(el, el.value.trim() ? '' : 'Zadejte název zakázky'); });
 
-  /* krok 2 */
+  /* krok 1: schody */
   function gSummary(g) { return esc(g.width) + ' × ' + esc(g.depth) + ' cm · ' + esc(g.count) + ' ks'; }
   function groupCard(g, i, n) {
     function fld(f, label, unit, mode) {
@@ -152,8 +153,8 @@
       '<label class="check"><span>Obkládat podstupnici</span><input type="checkbox" data-g="' + i + '" data-change="gcover"' + (g.coverRiser ? ' checked' : '') + '></label>' +
       '<div class="group-area"><span class="muted small">Plocha skupiny</span><span class="chip soft" id="areaWrap' + i + '"><span id="area' + i + '">' + m2(Calc.groupArea(g)) + '</span></span></div></div></div>';
   }
-  function step2(c) {
-    return '<h1 class="wiz-title">Schody</h1><p class="lead-text">Schody stejných rozměrů zadejte jako jednu skupinu. Předvyplněno typickými rozměry – stačí přepsat.</p>' +
+  function stepStairs(c) {
+    return '<h1 class="wiz-title">Schody</h1><p class="lead-text">Začněte rozměry schodů – cenu uvidíte hned dole. Schody stejných rozměrů zadejte jako jednu skupinu.</p>' +
       c.groups.map(function (g, i) { return groupCard(g, i, c.groups.length); }).join('') +
       '<button class="btn block" data-click="gAdd">' + ic('plus') + 'Přidat skupinu</button>' + A.question('spiral');
   }
@@ -191,9 +192,9 @@
     W.c.groups.splice(+el.dataset.g, 1); W.folded = {}; touch(W.c); A.toast('Skupina odstraněna'); A.dispatch();
   });
 
-  /* krok 3 */
-  function step3(c) {
-    var pr = A.pricingOf(c), valid = !Object.keys(stepErrors(c, 2)).length;
+  /* krok 2: vzor */
+  function stepPattern(c) {
+    var pr = A.pricingOf(c), valid = !Object.keys(stepErrors(c, 1)).length;
     var cmp = valid ? Calc.comparePatterns(c.groups, pr, c.discount, c.vatRate, c.extras) : null;
     var min = cmp ? Math.min.apply(null, cmp.map(function (x) { return x.quote.total; })) : null;
     return '<h1 class="wiz-title">Vzor obkladu</h1><p class="lead-text">Cena u vzoru je orientační celek s DPH pro vaše schody.</p><div class="tiles" role="radiogroup" aria-label="Vzor">' +
@@ -411,11 +412,11 @@
   /* ---------- porovnání vzorů ---------- */
   A.route('/compare/:id', 'user', function (p, user) {
     var c = loadCalc(p.id, user); if (!c) return;
-    if (Object.keys(stepErrors(c, 2)).length) return A.go('/wizard/' + c.id + '/2');
+    if (Object.keys(stepErrors(c, 1)).length) return A.go('/wizard/' + c.id + '/1');
     W.c = c;
     var pr = A.pricingOf(c), cmp = Calc.comparePatterns(c.groups, pr, c.discount, c.vatRate, c.extras);
     var min = Math.min.apply(null, cmp.map(function (x) { return x.quote.total; }));
-    var back = c.number || ro(c) ? '#/calc/' + c.id : '#/wizard/' + c.id + '/3';
+    var back = c.number || ro(c) ? '#/calc/' + c.id : '#/wizard/' + c.id + '/2';
     function use(x) {
       if (c.patternId === x.pattern.id) return '<span class="badge st-přijato">' + ic('check', 'sm') + 'Vybraný vzor</span>';
       return ro(c) ? '' : '<button class="btn sm tonal" data-click="usePattern" data-p="' + x.pattern.id + '">Použít</button>';

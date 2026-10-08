@@ -33,7 +33,7 @@ var App = (function () {
   var QUESTIONS = [
     { k: 'firms', t: 'Více firem?', x: 'Používá aplikaci jeden podlahář, nebo více firem, každá s vlastním ceníkem? Teď je ceník společný a spravuje ho admin.' },
     { k: 'numbering', t: 'Číselná řada kalkulací', x: 'Je číslování RRRR-NNNN společné pro všechny, nebo má každý podlahář svou vlastní řadu? Teď je společná.' },
-    { k: 'custContact', t: 'E-mail a telefon zákazníka', x: 'Krok 1 podle zadání neobsahuje e-mail ani telefon zákazníka, ale „Odeslat e-mailem“ e-mail potřebuje. Zatím se zadává až v okně odeslání. Přidat pole sem?' },
+    { k: 'custContact', t: 'E-mail a telefon zákazníka', x: 'Krok Zakázka (3.) podle zadání neobsahuje e-mail ani telefon zákazníka, ale „Odeslat e-mailem“ e-mail potřebuje. Zatím se zadává až v okně odeslání. Přidat pole sem?' },
     { k: 'spiral', t: 'Točité / lichoběžníkové schody a podesty', x: 'Zadání počítá jen s obdélníkovými nášlapy. Jak řešit točité schody, zkosené nášlapy a podesty?' },
     { k: 'photos', t: 'Fotky vzorů', x: 'Ukázkové fotky jsou nahrazeny texturami. Správce nahraje skutečné fotky v administraci. Stačí jedna fotka na vzor?' },
     { k: 'labor', t: 'Práce za kus vs. za m²', x: 'Práce se teď počítá za nášlap (Kč/ks). Účtuje podlahář práci spíš za nášlap, nebo za m²? Případně podle vzoru?' },

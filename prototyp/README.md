@@ -45,7 +45,7 @@ Zobrazují se jako malé štítky „? Otázka“ u místa, kterého se týkají
 2. Je podlahář plátce DPH?
 3. Točité / lichoběžníkové schody a podesty.
 4. Jeden podlahář vs. více firem s vlastním ceníkem.
-5. E-mail/telefon zákazníka není v kroku 1, ale pro odeslání je potřeba.
+5. E-mail/telefon zákazníka není v kroku Zakázka, ale pro odeslání je potřeba.
 6. ~~Vidí admin kalkulace všech uživatelů?~~ – rozhodnuto: ano, admin vidí a může otevřít kalkulace všech podlahářů (podlahář jen své).
 7. Číselná řada: společná, nebo pro každého podlaháře?
 8. Má „Upravit“ držet staré ceny?
