@@ -93,7 +93,7 @@ export default function UsersPage() {
         {mail && (
           <>
             <h2>Pozvánka vytvořena</h2>
-            <p className="small muted">Demo: e-mail se neodesílá, zobrazujeme jeho náhled.</p>
+            {mail.link && <p className="small muted">Demo: e-mail se neodesílá, zobrazujeme jeho náhled.</p>}
             <MailPreviewCard mail={mail} />
             <div className="dlg-foot"><button className="btn" onClick={() => { setMail(null); refresh(); }}>Zavřít</button></div>
           </>

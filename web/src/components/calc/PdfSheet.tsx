@@ -12,7 +12,7 @@ function PdfRow({ k, v, bold }: { k: string; v: string; bold?: boolean }) {
   );
 }
 
-/** Tisková A4 stránka kalkulace. Serverové PDF s logem přijde s backendem; zatím window.print(). */
+/** Tisková A4 stránka kalkulace. Stejnou komponentu renderuje server do PDF (src/server/pdf.tsx). */
 export function PdfSheet({
   calc: c, pattern: pat, quote: q, rates: r, owner,
 }: { calc: Calculation; pattern: Pattern; quote: Quote; rates: Rates; owner: Profile }) {
@@ -81,7 +81,7 @@ export function PdfSheet({
           <span className="v">{formatCZK(q.total)}</span>
         </div>
         <div className="pdf-foot">
-          Náhled kalkulace. V ostré verzi PDF vytváří server. Cena platí dle ceníku k {fmtDate(c.createdAt)}.
+          Cena platí dle ceníku k {fmtDate(c.createdAt)}.
         </div>
       </div>
     </div>

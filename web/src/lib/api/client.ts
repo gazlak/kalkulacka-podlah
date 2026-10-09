@@ -11,7 +11,7 @@ export type TokenCheck = { ok: true; email: string } | { ok: false; error: strin
 export interface MailPreview {
   to: string;
   subject: string;
-  /** Odkaz v aplikaci (jen v mocku se zobrazuje jako „otevřít odkaz (demo)“). */
+  /** Odkaz v aplikaci (jen v mocku se zobrazuje jako „otevřít odkaz (demo)“); u skutečného backendu prázdný – e-mail odešel. */
   link: string;
   kind: "reset" | "invite";
   expiresInfo: string;

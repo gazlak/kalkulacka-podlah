@@ -1,9 +1,13 @@
 import Link from "next/link";
 import type { MailPreview } from "@/lib/api/client";
+import { Alert } from "@/components/ui/misc";
 import { MailBox } from "@/components/calc/MailBox";
 
 /** Náhled e-mailu (jen mock – skutečný e-mail pošle server). */
 export function MailPreviewCard({ mail }: { mail: MailPreview }) {
+  if (!mail.link) {
+    return <Alert kind="ok">E-mail „{mail.subject}“ byl odeslán na {mail.to}. {mail.expiresInfo}</Alert>;
+  }
   const reset = mail.kind === "reset";
   return (
     <div className="card">

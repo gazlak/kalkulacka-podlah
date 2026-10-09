@@ -41,7 +41,11 @@ function Pdf({ id }: { id: string }) {
       <PdfSheet calc={c} pattern={pat} quote={quoteOf(c, pricing.data)} rates={pricingOf(c, pricing.data).rates} owner={owner} />
       <ActionBar>
         <BackButton href={back} />
-        <button className="btn primary" onClick={() => window.print()}><Icon name="print" />Tisk / Uložit jako PDF</button>
+        {process.env.NEXT_PUBLIC_API === "http" ? (
+          <a className="btn primary" href={`/api/calculations/${id}/pdf`} download><Icon name="print" />Stáhnout PDF</a>
+        ) : (
+          <button className="btn primary" onClick={() => window.print()}><Icon name="print" />Tisk / Uložit jako PDF</button>
+        )}
       </ActionBar>
     </>
   );

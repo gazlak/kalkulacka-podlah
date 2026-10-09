@@ -113,7 +113,7 @@ export function useCalcActions(draft: CalcDraft) {
     draft.replace(await api.calculations.send(calc.id, mail));
     refreshList();
     setMailOpen(false);
-    toast(`Kalkulace odeslána na ${mail.to.trim()} (demo)`);
+    toast(`Kalkulace odeslána na ${mail.to.trim()}${process.env.NEXT_PUBLIC_API === "http" ? "" : " (demo)"}`);
   }
 
   return { moreOpen, setMoreOpen, mailOpen, setMailOpen, save, pdf, duplicate, recalc, setStatus, openMail, sendMail };

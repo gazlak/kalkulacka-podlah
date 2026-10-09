@@ -68,3 +68,29 @@ export function fieldErrors(err: z.ZodError): Record<string, string> {
   }
   return out;
 }
+
+/* ---- vstup API (server) ---- */
+const rawNum = z.union([z.number(), z.string().max(40)]);
+
+export const calcInputSchema = z.object({
+  id: z.uuid("Neplatné ID kalkulace"),
+  job: z.object({ name: z.string().max(200), customer: z.string().max(200), address: z.string().max(300), note: z.string().max(2000) }),
+  groups: z.array(z.object({ width: rawNum, depth: rawNum, riserHeight: rawNum, count: rawNum, coverRiser: z.boolean() })).min(1).max(50),
+  patternId: z.number().int().nullable(),
+  discount: z.object({ type: z.enum(["pct", "czk"]), value: rawNum }),
+  vatRate: z.number().min(0).max(1),
+  extras: z.record(z.string().max(60), rawNum),
+});
+
+export const ratesSchema = z.object({
+  riserSurcharge: z.number().min(0),
+  transport: z.number().min(0),
+  vatDefault: z.number().min(0).max(1),
+  vatOptions: z.array(z.number().min(0).max(1)).min(1).max(10),
+  roundTo: z.number().positive(),
+  extrasEnabled: z.boolean(),
+  extras: z.array(z.object({ key: z.string().min(1).max(60), label: z.string().max(120), unit: z.string().max(30), price: z.number().min(0) })).max(30),
+});
+
+export const patternPatchSchema = patternSchema.extend({ photo: z.string().nullable().optional() });
+export const statusSchema = z.enum(["koncept", "odesláno", "přijato", "zamítnuto"]);

@@ -27,7 +27,8 @@ export function useCalcDraft(id: string) {
   useEffect(() => {
     let alive = true;
     api.calculations.get(id).then((stored) => {
-      if (!alive) return;
+      // pozdní odpověď nesmí přepsat lokální úpravy (např. opakované načtení při Fast Refresh)
+      if (!alive || latest.current) return;
       const c = stored ?? getPendingDraft(id);
       if (!c) return setLoad("missing");
       latest.current = c;
