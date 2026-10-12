@@ -1,16 +1,27 @@
-/* Seed data (DEFAULTS). Vše je VYMYŠLENÉ – ukázková data pro prototyp.
+/* Seed data (DEFAULTS). Sazby, uživatelé a kalkulace jsou VYMYŠLENÉ – ukázková data pro prototyp.
  * Za běhu se čte výhradně ze Store (localStorage); DEFAULTS slouží jen jako seed. */
 var DEFAULTS = {
-  patterns: [
-    { id: 1, name: 'Dub přírodní',   texture: 'planks',      tint: '#c9a266', photo: null, materialPerM2: 1190, wastePct: 10, laborPerTread: 450 },
-    { id: 2, name: 'Dub bělený',     texture: 'planks',      tint: '#e3d3b6', photo: null, materialPerM2: 1290, wastePct: 10, laborPerTread: 450 },
-    { id: 3, name: 'Ořech americký', texture: 'parquet',     tint: '#6b4631', photo: null, materialPerM2: 1690, wastePct: 12, laborPerTread: 520 },
-    { id: 4, name: 'Rybí kost dub',  texture: 'herringbone', tint: '#b98a4e', photo: null, materialPerM2: 1890, wastePct: 15, laborPerTread: 650 },
-    { id: 5, name: 'Vinyl kámen',    texture: 'stone',       tint: '#9a9890', photo: null, materialPerM2: 790,  wastePct: 8,  laborPerTread: 380 },
-    { id: 6, name: 'Laminát šedý',   texture: 'laminate',    tint: '#8d9094', photo: null, materialPerM2: 590,  wastePct: 8,  laborPerTread: 350 }
-  ],
+  // vzory = dekory Floor Forever (patterns.js). Cena za m² je jen orientační střed cenového pásma z e-shopu (priceEst),
+  // dekor bez pásma má 0 = cena nezadána; skutečné ceny doplní správce. Prořez a práce za nášlap jsou ukázkové.
+  patterns: FF_PATTERNS.map(function (r, i) {
+    var mid = { '0-500': 400, '500-900': 700, '900-1500': 1200, '1500-2500': 2000 }[r[4]] || 0;
+    return { id: i + 1, name: r[2], typ: r[0], kolekce: r[1], barva: r[3], texture: r[0] === 'laminat' ? 'laminate' : 'planks', tint: '#c9a266',
+      photo: FF_IMG + r[5], materialPerM2: mid, priceEst: true, wastePct: 10, laborPerTread: 450 };
+  }),
   rates: {
-    riserSurcharge: 250, transport: 1500, vatDefault: 0.21, vatOptions: [0.21, 0.12], roundTo: 1,
+    riserSurcharge: 250, transport: 1500,
+    // příplatek podle typu nášlapu (Kč/nášlap) – zatím bez vstupů, proto 0
+    treadSurcharge: { nose: 0, flat: 0, landingNose: 0, landingFlat: 0 },
+    // složky ceny za m² podle typu nášlapu: podklad MDF (tloušťka v mm × cena za m³ v EUR × kurz), lepidlo a práce za m²
+    // kurz je ukázkový; lepidlo a práce za m² zatím bez vstupů, proto 0
+    m2: {
+      mdfEurM3: 370, eurRate: 25,
+      byTread: {
+        nose: { mdfMm: 12, glue: 0, labor: 0 }, flat: { mdfMm: 12, glue: 0, labor: 0 },
+        landingNose: { mdfMm: 12, glue: 0, labor: 0 }, landingFlat: { mdfMm: 12, glue: 0, labor: 0 }
+      }
+    },
+    vatDefault: 0.21, vatOptions: [0.21, 0.12], roundTo: 1,
     extrasEnabled: false,
     extras: [
       { key: 'edges',   label: 'Schodové hrany',   unit: 'bm', price: 180 },
@@ -35,7 +46,7 @@ var DEFAULTS = {
       groups: [{ width: 90, depth: 28, riserHeight: 17, count: 12, coverRiser: true }], patternId: 1, discount: { type: 'pct', value: 5 }, vatRate: 0.21 },
     { id: 'c2', ownerId: 'u2', number: '2026-0041', daysAgo: 3, status: 'odesláno', sentTo: 'horakova@example.cz',
       job: { name: 'Byt Horákovi – vstupní schodiště', customer: 'Marie Horáková', address: 'Nádražní 5, Praha', note: 'Zákazník chce tmavší odstín' },
-      groups: [{ width: 100, depth: 30, riserHeight: 18, count: 10, coverRiser: true }, { width: 120, depth: 30, riserHeight: 18, count: 2, coverRiser: false }],
+      groups: [{ width: 100, depth: 30, riserHeight: 18, count: 10, coverRiser: true }, { width: 120, depth: 30, riserHeight: 18, count: 2, coverRiser: true }],
       patternId: 3, discount: { type: 'czk', value: 500 }, vatRate: 0.21 },
     { id: 'c3', ownerId: 'u2', number: null, daysAgo: 0, status: 'koncept', sentTo: null,
       job: { name: 'Rozpracovaná zakázka – Černý', customer: 'Tomáš Černý', address: '', note: '' },
@@ -45,7 +56,14 @@ var DEFAULTS = {
       groups: [{ width: 80, depth: 26, riserHeight: 19, count: 8, coverRiser: true }], patternId: 5, discount: { type: 'pct', value: 0 }, vatRate: 0.12 },
     { id: 'c5', ownerId: 'u1', number: '2026-0038', daysAgo: 20, status: 'odesláno', sentTo: 'admin-zakaznik@example.cz',
       job: { name: 'Showroom – ukázkové schodiště', customer: 'Interiéry Plus', address: 'Průmyslová 1, Ostrava', note: '' },
-      groups: [{ width: 110, depth: 32, riserHeight: 17, count: 6, coverRiser: true }], patternId: 4, discount: { type: 'pct', value: 10 }, vatRate: 0.21 }
+      groups: [{ width: 110, depth: 32, riserHeight: 17, count: 6, coverRiser: true }], patternId: 4, discount: { type: 'pct', value: 10 }, vatRate: 0.21 },
+    // pravotočivé schodiště 180°: rovné rameno, šest šikmých schodů po 30° (vlevo 62 cm u stěny, vpravo 10 cm u vřetene), rovné rameno
+    { id: 'c6', ownerId: 'u2', number: null, daysAgo: 0, status: 'koncept', sentTo: null, stairType: 'right',
+      job: { name: 'Ukázka – pravotočivé schodiště 180°', customer: 'Jana Malá', address: 'Školní 8, Olomouc', note: '' },
+      groups: [{ width: 90, depth: 28, riserHeight: 17, count: 4, coverRiser: true, treadType: 'nose' },
+        { width: 90, depth: 62, depthRight: 10, depthSame: false, riserHeight: 17, count: 6, coverRiser: true, treadType: 'nose' },
+        { width: 90, depth: 28, riserHeight: 17, count: 4, coverRiser: true, treadType: 'nose' }],
+      patternId: 1, discount: { type: 'pct', value: 0 }, vatRate: 0.21 }
   ]
 };
 
