@@ -40,7 +40,7 @@ Uložená kalkulace si drží **snapshot celého ceníku**. Změna ceníku ji ne
 Skutečná autentizace a hashování hesel, HTTPS, serverové generování PDF, odesílání e-mailů, PostgreSQL + REST API, hosting v EU, zálohy, GDPR.
 
 ## Otevřené otázky pro zadavatele
-Zobrazují se jako malé štítky „? Otázka“ u místa, kterého se týkají (klepnutím se otevře text). Souhrnný panel všech otázek a „Režim prezentace“ (skryje štítky) jsou v sheetu „Prototyp“ v proužku nahoře.
+Zobrazují se jako malé štítky „? Otázka“ u místa, kterého se týkají (klepnutím se otevře text). Souhrnný panel všech otázek a „Režim prezentace“ (skryje štítky) jsou v sheetu „Prototyp“ v proužku nahoře. Tamtéž je i přepínač „Vzhled“: Auto (podle systému) / Světlý / Tmavý, volba se pamatuje.
 1. Práce za kus (nášlap) vs. za m²?
 2. Je podlahář plátce DPH?
 3. Točité / lichoběžníkové schody a podesty.

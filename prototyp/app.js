@@ -175,13 +175,21 @@ var App = (function () {
   /* ---------- sheet „Prototyp“ ---------- */
   A.on('click', 'protoSheet', function () {
     var user = Store.currentUser(), pres = document.body.classList.contains('present');
-    A.modal('<h2>Prototyp</h2>' + A.sheetList(
+    var theme = document.documentElement.dataset.theme || 'auto';
+    A.modal('<h2>Prototyp</h2><div class="lbl">Vzhled</div><div class="seg full" role="group" aria-label="Vzhled">' +
+      [['auto', 'Auto'], ['light', 'Světlý'], ['dark', 'Tmavý']].map(function (t) { return '<button type="button" data-click="theme" data-v="' + t[0] + '" class="' + (theme === t[0] ? 'on' : '') + '" aria-pressed="' + (theme === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div>' + A.sheetList(
       '<label class="lrow check"><span class="k">Režim prezentace<small>Skryje značky otázek a poznámky prototypu</small></span><input type="checkbox" id="presentToggle" data-change="present"' + (pres ? ' checked' : '') + '></label>' +
       '<button type="button" class="lrow" data-click="qall"><span class="lead">' + A.icon('help') + '<span class="k">Panel otázek<small>Všechny otázky pro zadavatele (' + QUESTIONS.length + ')</small></span></span>' + A.icon('chev-r', 'chev') + '</button>' +
       '<button type="button" class="lrow" data-click="resetDemo"><span class="lead">' + A.icon('refresh') + '<span class="k">Obnovit ukázková data<small>Vrátí ceník, uživatele i kalkulace</small></span></span>' + A.icon('chev-r', 'chev') + '</button>' +
       (user ? '<div class="lrow"><span class="lead"><span class="avatar">' + esc(A.initials(user)) + '</span><span class="k">' + esc(user.profile.name || user.email) + '<small>' + esc(user.email) + (user.role === 'admin' ? ' · správce' : '') + '</small></span></span></div>' +
         '<button type="button" class="lrow" data-click="logout"><span class="lead">' + A.icon('logout') + '<span class="k">Odhlásit se</span></span></button>' : '')) +
       '<div class="dlg-foot"><button class="btn primary" data-click="closeModal">Hotovo</button></div>');
+  });
+  A.on('click', 'theme', function (el) {
+    var v = el.dataset.v;
+    if (v === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = v;
+    try { if (v === 'auto') localStorage.removeItem('kp_theme'); else localStorage.setItem('kp_theme', v); } catch (e) { /* ignore */ }
+    Array.prototype.forEach.call(el.parentNode.children, function (b) { var on = b === el; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
   });
   A.on('change', 'present', function (el) {
     document.body.classList.toggle('present', el.checked);
