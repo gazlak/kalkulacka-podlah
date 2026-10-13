@@ -294,11 +294,49 @@ body.present .qrow, body.present .qchip, body.present [data-qonly] { display: no
 .group-card.collapsed .gh { margin-bottom: 0; }
 .group-card .fold .ic { transition: transform .15s; }
 .group-card.collapsed .fold .ic { transform: rotate(-90deg); }
-.group-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 var(--s-3); }
+.group-grid, .depth-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0 var(--s-3); }
+.depth-row { margin-top: var(--s-3); }
+.keep-hidden { visibility: hidden; }
+.group-grid .span2 { grid-column: span 2; }
+/* půdorys schodiště */
+.plan { text-align: center; }
+.plan svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }
+.plan .pg { stroke: var(--text); stroke-width: 1; stroke-linejoin: round; }
+.plan .pg0 { fill: color-mix(in oklab, var(--accent) 14%, var(--surface)); }
+.plan .pg1 { fill: color-mix(in oklab, var(--accent) 34%, var(--surface)); }
+.plan .pg2 { fill: color-mix(in oklab, var(--accent) 24%, var(--surface)); }
+.plan .pg3 { fill: color-mix(in oklab, var(--accent) 44%, var(--surface)); }
+.plan .nose { fill: none; stroke: var(--text); stroke-width: 1; stroke-dasharray: 3 2; opacity: .5; }
+.plan .way { fill: none; stroke: var(--accent-ink); stroke-width: 1.5; stroke-linejoin: round; }
+.plan .way-head { fill: var(--accent-ink); }
+.plan .pnum { font-size: 11px; font-weight: 700; fill: var(--text); }
+.plan .plan-note { margin: var(--s-3) 0 0; }
+.plan polygon[class^="v-"] { stroke: oklch(20% .02 260 / .45); stroke-width: .7; stroke-linejoin: round; }
+.plan .v-tread.v-plain { fill: color-mix(in oklab, var(--accent) 16%, var(--surface)); }
+.plan .v-riser.v-plain { fill: color-mix(in oklab, var(--accent) 30%, var(--surface)); }
+.plan .v-bare { fill: color-mix(in oklab, var(--text) 16%, var(--surface)); }
+.plan .v-side { fill: color-mix(in oklab, var(--text) 38%, var(--surface)); }
+.plan .v-shade { fill: oklch(0% 0 0 / .22); stroke: none; }
+.field.hidden { display: none; }
+.plan .plan-warn { margin: var(--s-2) 0 0; color: var(--warn); }
+.pdf-sheet .plan { --text: #1a1d24; --surface: #fff; --accent: #1d3e85; --accent-ink: #1d3e85; --muted: #5f6673; --warn: #8a5a00; margin: var(--s-4) 0; break-inside: avoid; }
+.group-card .gh button.fold { flex: 1 1 0; min-width: 0; }
+.group-card .gh .gcount { flex: none; width: 124px; margin: 0; }
+.group-card .gh .gcount .stepper-num { height: var(--h-btn-sm); }
+.group-card .gh .gcount .err { text-align: right; }
+.group-card.collapsed .gcount { display: none; }
+.stairs-sum { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-2) var(--s-3); margin-bottom: var(--s-4); border-radius: var(--r-md, 12px); background: var(--accent-soft); color: var(--accent-ink); text-decoration: none; font-size: var(--fs-sm); }
+.stairs-sum .grow { min-width: 0; flex: 1; }
+.stairs-sum b { display: block; font-variant-numeric: tabular-nums; }
+.stairs-sum small { display: block; opacity: .85; }
+.stairs-sum .edit { flex: none; display: inline-flex; align-items: center; gap: 2px; font-weight: 600; }
 .group-area { display: flex; justify-content: space-between; align-items: center; gap: var(--s-3); margin-top: var(--s-3); }
 .group-area .chip { cursor: default; font-variant-numeric: tabular-nums; }
 .group-card .check { margin-top: calc(var(--s-1) * -1); }
 
+.pat-filter { display: flex; flex-direction: column; gap: var(--s-2); margin-bottom: var(--s-3); }
+.pat-filter .group-grid { grid-template-columns: 1fr 1fr; }
+.pat-count { margin: 0 var(--s-1) var(--s-2); }
 .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3); }
 .tile { position: relative; border: 2px solid var(--line); border-radius: var(--r-lg); overflow: hidden; background: var(--surface); cursor: pointer; display: block; transition: border-color .15s, transform .15s; }
 .tile:active { transform: scale(.98); }
@@ -459,7 +497,7 @@ body.has-bar #toast { bottom: calc(160px + var(--safe-b)); }
   .only-desktop { display: block; }
   table.only-desktop { display: table; }
   .only-mobile { display: none; }
-  .group-grid { grid-template-columns: repeat(4, 1fr); }
+  .group-grid, .depth-row { grid-template-columns: repeat(4, 1fr); }
   .tiles { grid-template-columns: repeat(3, 1fr); }
   .pdf-sheet { padding: var(--s-8) 48px; }
   .pdf-wrap { padding: var(--s-6) var(--s-4); }

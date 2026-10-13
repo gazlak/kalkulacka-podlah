@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="light dark">
   <title>Kalkulačka schodů – prototyp</title>
-  <script>try { var t = localStorage.getItem('kp_theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) { /* ignore */ }</script>
+  <script>/* výchozí je světlý režim; podle systému jen když si to uživatel zvolí (Auto) */
+    var t = null; try { t = localStorage.getItem('kp_theme'); } catch (e) { /* ignore */ }
+    if (t !== 'auto') document.documentElement.dataset.theme = t === 'dark' ? 'dark' : 'light';</script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -54,8 +56,10 @@
   <dialog id="modal"></dialog>
   <div id="toast" role="status" aria-live="polite"></div>
 
+  <script src="patterns.js"></script>
   <script src="data.js"></script>
   <script src="calc.js"></script>
+  <script src="plan.js"></script>
   <script src="store.js"></script>
   <script src="app.js"></script>
   <script src="wizard.js"></script>

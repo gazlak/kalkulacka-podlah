@@ -188,7 +188,7 @@ var App = (function () {
   A.on('click', 'theme', function (el) {
     var v = el.dataset.v;
     if (v === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = v;
-    try { if (v === 'auto') localStorage.removeItem('kp_theme'); else localStorage.setItem('kp_theme', v); } catch (e) { /* ignore */ }
+    try { localStorage.setItem('kp_theme', v); } catch (e) { /* ignore */ }
     Array.prototype.forEach.call(el.parentNode.children, function (b) { var on = b === el; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
   });
   A.on('change', 'present', function (el) {

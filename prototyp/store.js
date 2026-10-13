@@ -1,6 +1,6 @@
 /* localStorage – "databáze" prototypu, session, číslování. */
 var Store = (function () {
-  var KEY = 'kp_db_v1', SKEY = 'kp_session_v1';
+  var KEY = 'kp_db_v2', SKEY = 'kp_session_v1';
   var db = null;
 
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
@@ -12,21 +12,24 @@ var Store = (function () {
       rates: clone(DEFAULTS.rates),
       users: clone(DEFAULTS.users),
       tokens: {},
-      calculations: []
+      calculations: [], demoWinder: 1
     };
-    var now = Date.now();
-    DEFAULTS.calculations.forEach(function (c) {
-      var t = now - c.daysAgo * 86400000 - (c.daysAgo ? 3600000 * 2 : 0);
-      var k = clone(c); delete k.daysAgo;
-      k.createdAt = t; k.updatedAt = t;
-      k.snapshot = k.number ? { patterns: clone(DEFAULTS.patterns), rates: clone(DEFAULTS.rates) } : null;
-      d.calculations.push(k);
-    });
+    DEFAULTS.calculations.forEach(function (c) { d.calculations.push(seedCalc(c)); });
     return d;
+  }
+  function seedCalc(c) {
+    var t = Date.now() - c.daysAgo * 86400000 - (c.daysAgo ? 3600000 * 2 : 0);
+    var k = clone(c); delete k.daysAgo;
+    k.createdAt = t; k.updatedAt = t;
+    k.snapshot = k.number ? { patterns: clone(sameCollection(DEFAULTS.patterns, k.patternId)), rates: clone(DEFAULTS.rates) } : null;
+    return k;
   }
 
   function load() {
-    try { var raw = localStorage.getItem(KEY); if (raw) { db = JSON.parse(raw); if (db && db.users) return db; } } catch (e) { /* poškozená data */ }
+    try { var raw = localStorage.getItem(KEY); if (raw) { db = JSON.parse(raw); if (db && db.users) { if (!db.rates.m2) { db.rates.m2 = clone(DEFAULTS.rates.m2); db.rates.treadSurcharge = db.rates.treadSurcharge || clone(DEFAULTS.rates.treadSurcharge); save(); }
+      // ukázka točitého schodiště přibyla později – doplní se i do už uložených dat (jednou)
+      if (!db.demoWinder) { db.demoWinder = 1; if (!calcById('c6')) db.calculations.push(seedCalc(DEFAULTS.calculations.filter(function (c) { return c.id === 'c6'; })[0])); save(); }
+      return db; } } } catch (e) { /* poškozená data */ }
     db = seed(); save();
     return db;
   }
@@ -74,17 +77,23 @@ var Store = (function () {
     return y + '-' + String(max + 1).padStart(4, '0');
   }
   function currentPricing() { return clone({ patterns: db.patterns, rates: db.rates }); }
+  // vzory ze stejné kolekce jako vybraný vzor – jen ty jdou do snapshotu (stovky vzorů by zaplnily úložiště) a do porovnání
+  function sameCollection(patterns, patternId) {
+    var sel = patterns.filter(function (p) { return p.id === patternId; })[0];
+    return sel ? patterns.filter(function (p) { return p.kolekce === sel.kolekce; }) : [];
+  }
+  function snapshotFor(patternId) { return clone({ patterns: sameCollection(db.patterns, patternId), rates: db.rates }); }
   function newCalc(user) {
     var now = Date.now();
     return {
       id: uid('c'), ownerId: user.id, number: null, createdAt: now, updatedAt: now, status: 'koncept', sentTo: null,
       job: { name: '', customer: '', address: '', note: '' },
-      groups: [newGroup()], patternId: null, discount: { type: 'pct', value: 0 }, vatRate: db.rates.vatDefault,
+      stairType: 'straight', groups: [newGroup()], patternId: null, discount: { type: 'pct', value: 0 }, vatRate: db.rates.vatDefault,
       extras: {}, snapshot: null
     };
   }
   // výchozí hodnoty = typické rozměry (zrychlení cíle "do 2 minut")
-  function newGroup() { return { width: 100, depth: 28, riserHeight: 17, count: 1, coverRiser: true }; }
+  function newGroup() { return { width: 100, depth: 28, riserHeight: 17, count: 1, coverRiser: true, treadType: 'nose' }; }
 
   /* ----- tokeny (pozvánky, reset hesla) ----- */
   function makeToken(type, userId, ttlMs) {
@@ -99,6 +108,6 @@ var Store = (function () {
     setSession: setSession, clearSession: clearSession, currentUser: currentUser,
     userById: userById, userByEmail: userByEmail,
     calcById: calcById, calcsFor: calcsFor, canSee: canSee, upsertCalc: upsertCalc, nextNumber: nextNumber,
-    currentPricing: currentPricing, newCalc: newCalc, newGroup: newGroup, makeToken: makeToken
+    currentPricing: currentPricing, sameCollection: sameCollection, snapshotFor: snapshotFor, newCalc: newCalc, newGroup: newGroup, makeToken: makeToken
   };
 })();
