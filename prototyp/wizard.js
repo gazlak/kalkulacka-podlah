@@ -302,7 +302,7 @@
     var valid = !Object.keys(stepErrors(c, 1)).length;
     var cmp = valid ? Calc.comparePatterns(c.groups, { patterns: list, rates: pr.rates, collections: pr.collections }, c.discount, c.vatRate, c.extras, A.quoteOpt(c)) : null;
     var priced = cmp ? cmp.filter(function (x) { return priceOf(c, x.pattern) > 0; }).map(function (x) { return x.quote.total; }) : [];
-    var min = priced.length > 1 ? Math.min.apply(null, priced) : null;
+    var min = priced.length > 1 && Math.max.apply(null, priced) > Math.min.apply(null, priced) ? Math.min.apply(null, priced) : null; // při stejných cenách bez štítku
     if (!list.length) return '<p class="muted small">Žádný vzor neodpovídá filtru.</p>';
     return '<p class="small muted pat-count">' + list.length + ' z ' + pr.patterns.filter(function (p) { return Calc.patternOffered(pr, p); }).length + ' vzorů</p><div class="tiles" role="radiogroup" aria-label="Vzor">' +
       list.map(function (p, i) {
@@ -392,14 +392,12 @@
       '<div class="lbl mt">Sazba DPH</div><div class="seg full" role="group" aria-label="Sazba DPH">' + (pr.rates.vatOptions || [0.21, 0.12]).map(function (v) {
         return '<button type="button"' + dis + ' data-click="vat" data-v="' + v + '" class="' + (c.vatRate === v ? 'on' : '') + '">' + pct(v) + '</button>';
       }).join('') + '</div>' + A.question('vat') + '</div>';
-    // příplatky (návrh)
-    html += extrasCard(c, pr);
     // zakázka
     html += '<div class="section-title">Zakázka</div><div class="list">' + lr('Zakázka', '', '<span style="font-weight:600;white-space:normal">' + esc(c.job.name) + '</span>') +
       lr('Zákazník', '', esc(c.job.customer || '—')) + (c.job.address ? lr('Adresa', '', '<span style="white-space:normal">' + esc(c.job.address) + '</span>') : '') +
       (c.job.note ? lr('Poznámka', '', '<span style="white-space:normal;font-weight:400">' + esc(c.job.note) + '</span>') : '') +
       '<div class="firm">' + (owner.logo ? '<img src="' + owner.logo + '" alt="Logo">' : '') + '<div><b>' + esc(owner.company || owner.name || 'Vaše firma') + '</b><div class="small muted">' + [owner.name, owner.ico ? 'IČO ' + owner.ico : '', owner.phone].filter(Boolean).map(esc).join(' · ') + '</div></div></div></div>';
-    html += A.question('labor') + A.question('laborHours') + A.question('extras');
+    html += A.question('labor') + A.question('laborHours');
     if (c.number && !inWizard) html += A.question('editPrices');
     return html;
   }
@@ -446,7 +444,7 @@
     function f(k, label, auto, val) {
       return '<div class="field"><label for="bm_' + k + '">' + label + '</label><div class="inline-unit"><input type="text" id="bm_' + k + '" inputmode="decimal"' + d + ' value="' + esc(val === undefined || val === null ? '' : val) + '" placeholder="' + nf.format(auto) + '" data-input="bm" data-k="' + k + '"><span>bm</span></div></div>';
     }
-    return '<div class="section-title">Lišty a hrany</div><div class="card"><p class="small muted">Délka se počítá z naměřených rozměrů podle stran schodiště. Prázdné pole = automaticky, vyplněním hodnotu přepíšete.</p>' +
+    return '<div class="section-title">Lišty a hrany</div><div class="card"><p class="small muted">Lišta jde na stranu u zdi, vinylová hrana na otevřenou stranu. Délka každé strany = (hloubka nášlapu + výška podstupnice) × počet schodů, z naměřených rozměrů. Prázdné pole = automaticky, vyplněním hodnotu přepíšete.</p>' +
       '<div class="group-grid">' + f('trimBm', 'Lišta KPV50', q.autoTrimBm, c.trimBm) + f('edgeBm', 'Vinylová hrana', q.autoEdgeBm, c.edgeBm) + '</div>' + A.question('discountTrims') + '</div>';
   }
   A.on('input', 'bm', function (el) { if (ro()) return;

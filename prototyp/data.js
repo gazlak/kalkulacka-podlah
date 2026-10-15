@@ -41,8 +41,8 @@ var DEFAULTS = {
       photo: FF_IMG + r[5], collectionId: cid, variant: /CLICK/.test(r[2]) ? 'click' : 'glued', priceOverride: null, active: !!cid, wastePct: 10 };
   }),
   rates: {
-    // STARÁ pole (riserSurcharge, m2.byTread, extras edges/trims) čte jen legacy cesta výpočtu; nová cesta je nečte
-    riserSurcharge: 250, transport: 1500,
+    // STARÁ pole (m2.byTread, extras edges/trims) čte jen legacy cesta výpočtu; nová cesta je nečte
+    transport: 1500,
     mdf: { thicknessMm: 12, eurPerM3: 375 }, eur: { rate: 25, changedAt: Date.now() },
     glue: { czkPerKg: 324, gPerM2: 300, layers: 1 },
     reserve: { pct: 5, onVinyl: false },
@@ -65,10 +65,7 @@ var DEFAULTS = {
     },
     vatDefault: 0.21, vatOptions: [0.21, 0.12], roundTo: 1,
     extrasEnabled: false,
-    extras: [
-      { key: 'removal', label: 'Demontáž starého krytu', unit: 'nášlap', price: 90 },
-      { key: 'leveling', label: 'Vyrovnání podkladu',    unit: 'nášlap', price: 110 }
-    ]
+    extras: []  // volitelné příplatky (demontáž, vyrovnání) zrušeny
   },
   // role: user | admin; status: aktivní | pozván | blokován
   users: [

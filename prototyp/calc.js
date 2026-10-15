@@ -79,7 +79,7 @@ var Calc = (function () {
     var materialRaw = pat ? totalArea * (1 + waste) * pat.materialPerM2 : 0;
     var material = roundTo(materialRaw, step);
     var labor = pat ? roundTo(treads * pat.laborPerTread, step) : 0;
-    var risers = roundTo(riserTreads * rates.riserSurcharge, step);
+    var risers = 0; // příplatek za obklad podstupnice zrušen (podstupnice se obkládá vždy)
     var treadTypes = roundTo(treadTypesRaw, step);
     var mdf = roundTo(mdfRaw, step), glue = roundTo(glueRaw, step), laborM2 = roundTo(laborM2Raw, step);
     var transport = roundTo(rates.transport, step);
@@ -98,7 +98,6 @@ var Calc = (function () {
     if (glue) ln('glue', 'Lepidlo', totalArea, 'm²', 0, glue);
     ln('labor', 'Práce', treads, 'nášlap', pat ? n0(pat.laborPerTread) : 0, labor);
     if (laborM2) ln('laborM2', 'Práce za m²', totalArea, 'm²', 0, laborM2);
-    ln('risers', 'Obklad podstupnic', riserTreads, 'ks', n0(rates.riserSurcharge), risers);
     if (treadTypes) ln('treadTypes', 'Příplatek za typ nášlapu', 1, 'ks', treadTypes, treadTypes);
     ln('transport', 'Doprava', 1, 'paušál', transport, transport);
     if (rates.extrasEnabled && extrasTotal) ln('extras', 'Volitelné příplatky', 1, 'ks', extrasTotal, extrasTotal);

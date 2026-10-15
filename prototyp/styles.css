@@ -337,15 +337,15 @@ body.present .qrow, body.present .qchip, body.present [data-qonly] { display: no
 .pat-filter { display: flex; flex-direction: column; gap: var(--s-2); margin-bottom: var(--s-3); }
 .pat-filter .group-grid { grid-template-columns: 1fr 1fr; }
 .pat-count { margin: 0 var(--s-1) var(--s-2); }
-.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3); }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: var(--s-2); }
 .tile { position: relative; border: 2px solid var(--line); border-radius: var(--r-lg); overflow: hidden; background: var(--surface); cursor: pointer; display: block; transition: border-color .15s, transform .15s; }
 .tile:active { transform: scale(.98); }
 .tile input { position: absolute; opacity: 0; inset: 0; cursor: pointer; margin: 0; }
 .tile img { display: block; width: 100%; aspect-ratio: 4/3; object-fit: cover; }
-.tile .t { padding: var(--s-3); display: flex; flex-direction: column; gap: 2px; }
-.tile .t b { font-size: var(--fs-sm); line-height: 1.25; }
-.tile .t .tot { font-size: var(--fs-sm); font-variant-numeric: tabular-nums; margin-top: 4px; }
-.tile .t .tot b { font-size: var(--fs-md); }
+.tile .t { padding: var(--s-2); display: flex; flex-direction: column; gap: 2px; font-size: 12px; }
+.tile .t b { font-size: 12px; line-height: 1.25; }
+.tile .t .tot { font-size: 12px; font-variant-numeric: tabular-nums; margin-top: 4px; }
+.tile .t .tot b { font-size: var(--fs-sm); }
 .tile.selected { border-color: var(--accent); }
 .tile .tick { display: none; position: absolute; top: var(--s-2); right: var(--s-2); width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: var(--on-accent); align-items: center; justify-content: center; }
 .tile.selected .tick { display: flex; }
@@ -504,7 +504,6 @@ body.has-bar #toast { bottom: calc(160px + var(--safe-b)); }
   table.only-desktop { display: table; }
   .only-mobile { display: none; }
   .group-grid, .depth-row { grid-template-columns: repeat(4, 1fr); }
-  .tiles { grid-template-columns: repeat(3, 1fr); }
   .pdf-sheet { padding: var(--s-8) 48px; }
   .pdf-wrap { padding: var(--s-6) var(--s-4); }
   dialog { width: 520px; max-width: calc(100vw - 32px); margin: auto; border-radius: 20px; }
@@ -523,7 +522,6 @@ body.has-bar #toast { bottom: calc(160px + var(--safe-b)); }
   body.has-tabs main { padding-bottom: var(--s-8); }
   body.has-tabs #toast { bottom: var(--s-6); left: calc(50% + 48px); }
   .actionbar .inner { max-width: 640px; }
-  .tiles { grid-template-columns: repeat(3, 1fr); }
 }
 
 @media print {

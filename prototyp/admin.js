@@ -273,15 +273,14 @@
       '<div class="lbl">Normohodiny na nášlap</div><div class="group-grid">' +
       Calc.TREAD_TYPES.map(function (t) { return field('h_' + t.id, t.label + ' (h)', (lab.hoursByTread || {})[t.id]); }).join('') + '</div>' +
       field('riserHours', 'Podstupnice (h na kus)', lab.riserHours) + A.question('laborHours') + '</div>' +
-      '<div class="section-title">Lišty a hrany</div><div class="card"><div class="group-grid">' + field('trimPerBm', 'Lišta KPV50 (Kč/bm)', r.trimPerBm) + field('edgePerBm', 'Vinylová hrana (Kč/bm)', r.edgePerBm, 'Prázdné = nezadáno.') + '</div>' + A.question('edgePrice') + '</div>' +
+      '<div class="section-title">Lišty a hrany</div><div class="card"><div class="group-grid">' + field('trimPerBm', 'Lišta KPV50 (Kč/bm)', r.trimPerBm, 'Na stranu schodiště u zdi.') + field('edgePerBm', 'Vinylová hrana (Kč/bm)', r.edgePerBm, 'Na otevřenou stranu (bez zdi). Prázdné = nezadáno.') + '</div>' +
+      '<p class="small muted" style="margin:0">Délka se počítá z naměřených rozměrů pro každou stranu schodiště zvlášť: (hloubka nášlapu + výška podstupnice) × počet schodů. Strana u zdi jde do lišty, otevřená strana do hrany; u šikmých schodů se bere hloubka té strany. Kterou stranu má schodiště u zdi, se volí v kalkulaci (Strany schodiště).</p>' + A.question('edgePrice') + '</div>' +
       '<div class="section-title">Přídavky na ořez</div><div class="card"><div class="group-grid">' + field('alW', 'Šířka (cm)', al.width) + field('alD', 'Hloubka (cm)', al.depth) + field('alR', 'Podstupnice (cm)', al.riser) + '</div>' + A.question('allowanceAll') + '</div>' +
       '<div class="section-title">Nos schodu</div><div class="card"><p class="small muted">Přesah přes hranu a ohyb pro nos, zvlášť pro MDF a vinyl (mm).</p><div class="group-grid">' +
       field('nsMo', 'MDF přesah', ns.mdfOverhangMm) + field('nsMw', 'MDF ohyb', ns.mdfWrapMm) + field('nsVo', 'Vinyl přesah', ns.vinylOverhangMm) + field('nsVw', 'Vinyl ohyb', ns.vinylWrapMm) + '</div>' + A.question('noseAllowance') + '</div>' +
       '<div class="section-title">Prořez</div><div class="card">' + sel('wasteMode', 'Režim prořezu', [['lamellas', 'Podle lamel (skutečná spotřeba)'], ['pct', 'Paušál v % u dekoru']], r.wasteMode, 'Paušál se nastavuje u vzoru. U kolekce bez rozměru lamely se použije vždy paušál.') + A.question('lamellaJoint') + '</div>' +
       '<div class="section-title">Příplatek za typ nášlapu</div><div class="card"><div class="group-grid">' +
       Calc.TREAD_TYPES.map(function (t) { return field('t_' + t.id, t.label + ' (Kč/nášlap)', (r.treadSurcharge || {})[t.id] || 0); }).join('') + '</div><p class="small muted" style="margin:0">Případný příplatek, zatím 0.</p></div>' +
-      '<div class="section-title">Volitelné příplatky (návrh)</div><div class="card">' + check('extrasEnabled', 'Zapnout příplatky v kalkulaci', r.extrasEnabled) + '<div class="mt">' +
-      r.extras.map(function (x) { return field('x_' + x.key, x.label + ' (Kč/' + x.unit + ')', x.price); }).join('') + '</div></div>' +
       '<button class="btn primary block" type="submit">Uložit sazby</button></form>' +
       '<div class="section-title">Demo data</div><div class="card"><p class="small muted">Vrátí ceník, uživatele i kalkulace na původní ukázková data.</p><button class="btn danger block" data-click="resetDemo">' + ic('refresh') + 'Obnovit ukázková data</button></div>', { title: 'Správa' });
   });
@@ -307,7 +306,7 @@
     r.allowance = { width: num(e.alW), depth: num(e.alD), riser: num(e.alR) };
     r.nose = { mdfOverhangMm: num(e.nsMo), mdfWrapMm: num(e.nsMw), vinylOverhangMm: num(e.nsVo), vinylWrapMm: num(e.nsVw) };
     r.wasteMode = e.wasteMode.value;
-    r.extrasEnabled = e.extrasEnabled.checked; r.extras.forEach(function (x) { x.price = num(e['x_' + x.key]); });
+
     Store.save(); A.toast('Sazby uloženy'); A.dispatch();
   });
 })();

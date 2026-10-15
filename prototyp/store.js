@@ -41,13 +41,14 @@ var Store = (function () {
     ['mdf', 'eur', 'glue', 'reserve', 'labor', 'trimPerBm', 'edgePerBm', 'allowance', 'nose', 'wasteMode', 'variants'].forEach(function (k) {
       if (r[k] === undefined) r[k] = clone(def[k]);
     });
-    if (r.extras) r.extras = r.extras.filter(function (x) { return x.key !== 'edges' && x.key !== 'trims'; });
     return true;
   }
 
   function load() {
     try { var raw = localStorage.getItem(KEY); if (raw) { db = JSON.parse(raw); if (db && db.users) { if (migrate(db)) save();
       if (!db.rates.m2) { db.rates.m2 = clone(DEFAULTS.rates.m2); db.rates.treadSurcharge = db.rates.treadSurcharge || clone(DEFAULTS.rates.treadSurcharge); save(); }
+      // volitelné příplatky (demontáž, vyrovnání) a příplatek za podstupnici byly zrušeny – vyčistí se i z uložených dat
+      if ((db.rates.extras || []).length || db.rates.extrasEnabled || db.rates.riserSurcharge !== undefined) { db.rates.extras = []; db.rates.extrasEnabled = false; delete db.rates.riserSurcharge; save(); }
       // ukázka točitého schodiště přibyla později – doplní se i do už uložených dat (jednou)
       if (!db.demoWinder) { db.demoWinder = 1; if (!calcById('c6')) db.calculations.push(seedCalc(DEFAULTS.calculations.filter(function (c) { return c.id === 'c6'; })[0])); save(); }
       return db; } } } catch (e) { /* poškozená data */ }
