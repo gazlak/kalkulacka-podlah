@@ -30,8 +30,8 @@
     touch(c);
   }
   function priceKey(p) {
-    return JSON.stringify([p.patterns.map(function (x) { return [x.id, x.name, x.materialPerM2, x.wastePct, x.laborPerTread]; }),
-      p.rates.riserSurcharge, p.rates.transport, p.rates.roundTo, p.rates.extrasEnabled, p.rates.extras, p.rates.treadSurcharge, p.rates.m2]);
+    return JSON.stringify([p.patterns.map(function (x) { return [x.id, x.name, x.priceOverride, x.materialPerM2, x.wastePct, x.laborPerTread, x.collectionId]; }),
+      p.rates, p.collections || null]);
   }
   // snapshot drží jen vzory jedné kolekce, proto se porovnává se stejným výřezem aktuálního ceníku
   function priceChanged(c) { return !!c.snapshot && priceKey(c.snapshot) !== priceKey(Store.snapshotFor(c.patternId)); }
@@ -184,12 +184,33 @@
       '<div class="depth-row">' + fld('depth', depthName(g), 'cm', 'decimal') + fld('depthRight', 'Hloubka vpravo', 'cm', 'decimal', skew ? '' : ' keep-hidden') + '</div>' +
       // podstupnice se obkládá vždy, volba se proto nenabízí; podesta dělá ze skupiny podestový nášlap
       '<label class="check"><span>Podesta</span><input type="checkbox" data-g="' + i + '" data-change="glanding"' + (Calc.isLanding(g) ? ' checked' : '') + '></label>' +
-      '<div class="group-area"><span class="muted small">Plocha skupiny</span><span class="chip soft" id="areaWrap' + i + '"><span id="area' + i + '">' + m2(Calc.groupArea(g)) + '</span></span></div></div></div>';
+      '<div class="field"><label for="g' + i + 'side">Strana</label><select id="g' + i + 'side" data-g="' + i + '" data-change="gside"><option value="">Jako schodiště</option>' +
+      SIDES.map(function (s) { return '<option value="' + s[0] + '"' + (g.side === s[0] ? ' selected' : '') + '>' + s[1] + '</option>'; }).join('') + '</select></div>' +
+      '<div class="group-area"><span class="muted small">Plocha skupiny</span><span class="chip soft" id="areaWrap' + i + '"><span id="area' + i + '">' + m2(Calc.groupArea(g)) + '</span></span></div><div class="small muted calc-note" id="gnote' + i + '">' + groupNote(W.c, i) + '</div></div></div>';
   }
+  // rozměry, ze kterých se opravdu počítá (naměřené + přídavky), a varování ze spoje lamel; legacy snapshot nic neukazuje
+  function groupNote(c, i) {
+    var pr = A.pricingOf(c); if (Calc.isLegacy(pr) || !c.groups[i]) return '';
+    var d = Calc.pieceDims(c.groups[i], pr.rates), q = c.patternId ? A.quoteOf(c) : null, inf = q && q.groupsInfo[i];
+    return 'počítá se ' + nf1.format(d.w) + ' × ' + nf1.format(d.dVinyl) + ' cm' + (d.r ? ', podstupnice ' + nf1.format(d.r) + ' cm' : '') + (inf && inf.needsJoint ? ' ' + JOINT : '');
+  }
+  function updateNotes() { W.c.groups.forEach(function (g, i) { var el = A.$('#gnote' + i); if (el) el.innerHTML = groupNote(W.c, i); }); }
+  A.on('click', 'stairSide', function (el) {
+    W.c.stairSide = el.dataset.s; touch(W.c);
+    document.querySelectorAll('[data-click=stairSide]').forEach(function (b) { b.classList.toggle('on', b === el); });
+    barUpdate();
+  });
+  A.on('change', 'gside', function (el) {
+    var g = W.c.groups[+el.dataset.g]; if (el.value) g.side = el.value; else delete g.side;
+    touch(W.c); barUpdate();
+  });
   function stepStairs(c) {
     return '<h1 class="wiz-title">Schody</h1><p class="lead-text">Začněte rozměry schodů – cenu uvidíte hned dole. Schody stejných rozměrů zadejte jako jednu skupinu, odspodu nahoru.</p>' +
       '<div class="field"><label for="stType">Typ schodiště</label><select id="stType" data-change="stairType">' + opts(Calc.STAIR_TYPES, Calc.stairType(c).id) + '</select></div>' + sideField(c) +
       '<div class="field"><label for="trType">Typ nášlapu</label><select id="trType" data-change="treadNose">' + opts(NOSE_TYPES, Calc.hasNose(c.groups[0] || {}) ? 'nose' : 'flat') + '</select><div class="hint">Platí pro celé schodiště. Podestu označíte u její skupiny.</div></div>' +
+      '<div class="field"><span class="lbl">Strany schodiště</span><div class="seg full" role="group" aria-label="Strany schodiště">' + SIDES.map(function (s) {
+        return '<button type="button" data-click="stairSide" data-s="' + s[0] + '" class="' + ((c.stairSide || 'walls') === s[0] ? 'on' : '') + '">' + s[1] + '</button>';
+      }).join('') + '</div><div class="hint">Strana u zdi dostane lištu, otevřená strana vinylovou hranu.</div>' + A.question('trimRoute') + '</div>' +
       c.groups.map(function (g, i) { return groupCard(g, i, c.groups.length); }).join('') +
       '<button class="btn block" data-click="gAdd">' + ic('plus') + 'Přidat skupinu</button>' +
       '<div class="section-title">Půdorys schodiště</div>' + planCard(c) + A.question('spiral');
@@ -200,7 +221,7 @@
     A.$('#area' + i).textContent = m2(Calc.groupArea(g));
     A.$('#gsum' + i).innerHTML = gSummary(g);
     if (!Calc.validateGroup(g)[el.dataset.f]) A.setErr(el, '');
-    barUpdate(); updatePlan();
+    barUpdate(); updatePlan(); updateNotes();
   }
   A.on('change', 'stairType', function (el) { W.c.stairType = el.value; touch(W.c); A.$('#sideField').classList.toggle('hidden', el.value !== 'straight'); updatePlan(); });
   A.on('click', 'turnSide', function (el) {
@@ -212,11 +233,11 @@
   function setTread(g, nose, landing) { g.treadType = landing ? (nose ? 'landingNose' : 'landingFlat') : (nose ? 'nose' : 'flat'); }
   A.on('change', 'treadNose', function (el) {
     W.c.groups.forEach(function (g) { setTread(g, el.value === 'nose', Calc.isLanding(g)); });
-    touch(W.c); barUpdate(); updatePlan();
+    touch(W.c); barUpdate(); updatePlan(); updateNotes();
   });
   A.on('change', 'glanding', function (el) {
     setTread(W.c.groups[+el.dataset.g], A.$('#trType').value === 'nose', el.checked);
-    touch(W.c); barUpdate(); updatePlan();
+    touch(W.c); barUpdate(); updatePlan(); updateNotes();
   });
   A.on('input', 'gfield', onGroupInput);
   A.on('click', 'cntStep', function (el) {
@@ -243,7 +264,7 @@
     touch(W.c);
     A.$('#area' + i).textContent = m2(Calc.groupArea(g));
     A.$('#gsum' + i).innerHTML = gSummary(g);
-    barUpdate(); updatePlan();
+    barUpdate(); updatePlan(); updateNotes();
   });
   A.on('click', 'gAdd', function () {
     W.c.groups.forEach(function (g, i) { W.folded[i] = true; }); // dřívější skupiny se sbalí, nová je otevřená
@@ -265,33 +286,36 @@
     }
     return W.pf;
   }
-  function patPrice(p) { return p.materialPerM2 ? fmt(p.materialPerM2) + ' / m²' + (p.priceEst ? ' orientačně' : '') : 'cena za m² nezadána'; }
-  function patMatch(p, f) {
-    var band = CENY.filter(function (x) { return x[0] === f.cena; })[0], v = Calc.n0(p.materialPerM2);
+  function priceOf(c, p) { return Calc.patternPrice(A.pricingOf(c), p, c.formatId); }
+  function patPrice(p, c) { var v = priceOf(c, p); return v ? fmt(v) + ' / m²' + (p.priceEst ? ' orientačně' : '') : 'cena za m² nezadána'; }
+  function patMatch(p, f, c) {
+    var band = CENY.filter(function (x) { return x[0] === f.cena; })[0], v = priceOf(c, p);
     if (f.typ && p.typ !== f.typ) return false;
     if (f.kol && p.kolekce !== f.kol) return false;
     if (f.cena === 'x' ? v > 0 : f.cena && !(v >= band[2] && v < band[3])) return false;
     return !f.q || (p.name + ' ' + p.kolekce).toLowerCase().indexOf(f.q.toLowerCase()) >= 0;
   }
   function patTiles(c) {
-    var pr = A.pricingOf(c), f = patFilter(c), list = pr.patterns.filter(function (p) { return patMatch(p, f); });
+    var pr = A.pricingOf(c), f = patFilter(c);
+    // nabízí se jen aktivní dekory; už vybraný dekor zůstane vidět i po vypnutí
+    var list = pr.patterns.filter(function (p) { return (p.id === c.patternId || Calc.patternOffered(pr, p)) && patMatch(p, f, c); });
     var valid = !Object.keys(stepErrors(c, 1)).length;
-    var cmp = valid ? Calc.comparePatterns(c.groups, { patterns: list, rates: pr.rates }, c.discount, c.vatRate, c.extras) : null;
-    var priced = cmp ? cmp.filter(function (x) { return x.pattern.materialPerM2 > 0; }).map(function (x) { return x.quote.total; }) : [];
+    var cmp = valid ? Calc.comparePatterns(c.groups, { patterns: list, rates: pr.rates, collections: pr.collections }, c.discount, c.vatRate, c.extras, A.quoteOpt(c)) : null;
+    var priced = cmp ? cmp.filter(function (x) { return priceOf(c, x.pattern) > 0; }).map(function (x) { return x.quote.total; }) : [];
     var min = priced.length > 1 ? Math.min.apply(null, priced) : null;
     if (!list.length) return '<p class="muted small">Žádný vzor neodpovídá filtru.</p>';
-    return '<p class="small muted pat-count">' + list.length + ' z ' + pr.patterns.length + ' vzorů</p><div class="tiles" role="radiogroup" aria-label="Vzor">' +
+    return '<p class="small muted pat-count">' + list.length + ' z ' + pr.patterns.filter(function (p) { return Calc.patternOffered(pr, p); }).length + ' vzorů</p><div class="tiles" role="radiogroup" aria-label="Vzor">' +
       list.map(function (p, i) {
-        var sel = c.patternId === p.id, q = cmp && p.materialPerM2 > 0 ? cmp[i].quote : null;
+        var sel = c.patternId === p.id, q = cmp && priceOf(c, p) > 0 ? cmp[i].quote : null;
         return '<label class="tile' + (sel ? ' selected' : '') + '"><input type="radio" name="pattern" value="' + p.id + '" data-change="pickPattern"' + (sel ? ' checked' : '') + '>' +
           '<div style="position:relative"><img loading="lazy" src="' + A.patternImg(p) + '" alt="' + esc(p.name) + '">' + (q && q.total === min ? '<span class="ov">Nejlevnější</span>' : '') + '<span class="tick">' + ic('check') + '</span></div>' +
-          '<div class="t"><b>' + esc(p.name) + '</b><span class="small muted">' + patPrice(p) + '</span>' +
-          (q ? '<div class="tot"><b>' + fmt(q.total) + '</b> <span class="muted">s DPH</span></div>' : '') + '</div></label>';
+          '<div class="t"><b>' + esc(p.name) + '</b><span class="small muted">' + patPrice(p, c) + '</span>' +
+          (q ? '<div class="tot"><b>' + fmt(q.total) + '</b> <span class="muted">s DPH</span></div>' + (q.needsJoint ? JOINT : '') : '') + '</div></label>';
       }).join('') + '</div>';
   }
   function patFilters(c) {
     var pr = A.pricingOf(c), f = patFilter(c), kols = [];
-    pr.patterns.forEach(function (p) { if ((!f.typ || p.typ === f.typ) && kols.indexOf(p.kolekce) < 0) kols.push(p.kolekce); });
+    pr.patterns.forEach(function (p) { if ((!f.typ || p.typ === f.typ) && (p.id === c.patternId || Calc.patternOffered(pr, p)) && kols.indexOf(p.kolekce) < 0) kols.push(p.kolekce); });
     if (f.kol && kols.indexOf(f.kol) < 0) f.kol = '';
     return '<div class="pat-filter"><div class="seg full" role="group" aria-label="Typ podlahy">' + TYPY.map(function (t) {
       return '<button type="button" data-click="patTyp" data-t="' + t[0] + '" class="' + (f.typ === t[0] ? 'on' : '') + '">' + t[1] + '</button>';
@@ -302,20 +326,37 @@
   }
   function stepPattern(c) {
     return '<h1 class="wiz-title">Vzor obkladu</h1><p class="lead-text">Cena u vzoru je orientační celek s DPH pro vaše schody.' + (c.snapshot ? ' Uložená kalkulace nabízí vzory své kolekce; jiné se nabídnou po přepočtu podle aktuálního ceníku.' : '') + '</p>' +
-      viewCard(c) + '<div id="patFilters">' + patFilters(c) + '</div><div id="patTiles">' + patTiles(c) + '</div><div class="err" id="patErr" role="alert"></div>' + A.question('photos');
+      viewCard(c) + '<div id="patFilters">' + patFilters(c) + '</div><div id="fmtBox">' + formatSwitch(c) + '</div><div id="patTiles">' + patTiles(c) + '</div><div class="err" id="patErr" role="alert"></div>' + A.question('photos');
   }
+  // dlaždice Design Stone mají víc formátů téže kolekce; volba platí pro celou kalkulaci
+  function formatSwitch(c) {
+    var pr = A.pricingOf(c), pat = c.patternId ? Calc.findPattern(pr, c.patternId) : null, coll = pat && Calc.collectionOf(pr, pat, null);
+    if (!coll || !coll.family) return '';
+    var cur = c.formatId || coll.format, sibs = (pr.collections || []).filter(function (x) { return x.family === coll.family; });
+    return '<div class="field fmt-switch"><span class="lbl">Formát dlaždice</span><div class="seg full" role="group" aria-label="Formát dlaždice">' + sibs.map(function (x) {
+      return '<button type="button" data-click="fmt" data-f="' + x.format + '" class="' + (x.format === cur ? 'on' : '') + '">' + x.format + ' ' + nf.format(x.lamellaLengthMm) + '×' + nf.format(x.lamellaWidthMm) + '</button>';
+    }).join('') + '</div></div>';
+  }
+  A.on('click', 'fmt', function (el) { W.c.formatId = el.dataset.f; touch(W.c); A.$('#fmtBox').innerHTML = formatSwitch(W.c); patRefresh(false); barUpdate(); updateView(); });
   function patRefresh(all) { if (all) A.$('#patFilters').innerHTML = patFilters(W.c); A.$('#patTiles').innerHTML = patTiles(W.c); }
   A.on('click', 'patTyp', function (el) { W.pf.typ = el.dataset.t; W.pf.kol = ''; patRefresh(true); });
   A.on('change', 'patSel', function (el) { W.pf[el.dataset.k] = el.value; patRefresh(false); });
   A.on('input', 'patQ', function (el) { W.pf.q = el.value; patRefresh(false); });
   A.on('change', 'pickPattern', function (el) {
-    W.c.patternId = +el.value; touch(W.c);
+    W.c.patternId = +el.value;
+    var pr = A.pricingOf(W.c), coll = Calc.collectionOf(pr, Calc.findPattern(pr, W.c.patternId), null);
+    if (coll && coll.family) W.c.formatId = W.c.formatId || coll.format; else delete W.c.formatId;
+    touch(W.c); A.$('#fmtBox').innerHTML = formatSwitch(W.c);
     document.querySelectorAll('.tile').forEach(function (t) { t.classList.toggle('selected', t.contains(el)); });
     A.$('#patErr').textContent = ''; barUpdate(); updateView();
   });
 
   /* ---------- obrazovka kalkulace (krok 4 i detail) ---------- */
   function pct(v) { return new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 1 }).format(v * 100) + ' %'; }
+  var nf = new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 2 }), nf1 = new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 1 });
+  function fmtUnit(x) { return Math.abs(x - Math.round(x)) < 0.005 ? fmt(x) : nf.format(x) + ' Kč'; }
+  var JOINT = '<span class="joint">Schod vyžaduje spoj lamel</span>';
+  var SIDES = [['walls', 'Obě strany u zdi'], ['openLeft', 'Vlevo otevřená'], ['openRight', 'Vpravo otevřená'], ['openBoth', 'Obě otevřené']];
   function lr(k, sub, v, cls) { return '<div class="lrow ' + (cls || '') + '"><span class="k">' + k + (sub ? '<small>' + sub + '</small>' : '') + '</span><span class="v">' + v + '</span></div>'; }
   function calcBody(c, inWizard) {
     W.inWizard = !!inWizard;
@@ -326,7 +367,7 @@
     // hero
     html += '<div class="card hero calc-head"><div class="row between"><span class="eyebrow">Celkem s DPH</span>' + statusBadge(c.status) + '</div>' +
       '<div id="heroPrice">' + heroPrice(c) + '</div>' +
-      '<a class="pat" href="#/compare/' + c.id + '" aria-label="Porovnat vzory"><img src="' + A.patternImg(pat) + '" alt=""><span class="grow"><b>' + esc(pat.name) + '</b><span class="small">' + m2(q.totalArea) + ' · ' + patPrice(pat) + '</span></span><span class="small cmp-link">' + '<span class="lbl-t">Porovnat</span>' + ic('chev-r', 'sm') + '</span></a>' +
+      '<a class="pat" href="#/compare/' + c.id + '" aria-label="Porovnat vzory"><img src="' + A.patternImg(pat) + '" alt=""><span class="grow"><b>' + esc(pat.name) + '</b><span class="small">' + m2(q.totalArea) + ' · ' + patPrice(pat, c) + '</span></span><span class="small cmp-link">' + '<span class="lbl-t">Porovnat</span>' + ic('chev-r', 'sm') + '</span></a>' +
       '<div class="meta"><span>' + (c.number ? 'č. <b style="color:var(--text)">' + esc(c.number) + '</b>' : 'číslo bude přiděleno při uložení') + '</span><span>' + A.fmtDate(c.createdAt) + '</span></div></div>';
     html += actionGrid(c, inWizard);
     // stav
@@ -339,8 +380,12 @@
     html += '<div class="section-title">Rozpis ceny</div><div id="sums">' + sums(c) + '</div>';
     // schody
     html += '<div class="section-title">Schody</div><div class="list">' + c.groups.map(function (g, i) {
-      return '<div class="lrow"><span class="k">' + esc(g.width) + ' × ' + esc(Calc.depthLabel(g)) + ' cm<small>' + esc(g.count) + ' ks · ' + Calc.treadType(g).label.toLowerCase() + ' · ' + (g.coverRiser ? 'podstupnice ' + esc(g.riserHeight) + ' cm' : 'bez podstupnice') + '</small></span><span class="v">' + m2(q.areas[i]) + '</span></div>';
-    }).join('') + lr('Celková plocha', '', m2(q.totalArea), 'tot') + lr('Typ schodiště', '', Calc.stairType(c).label) + '</div>' + viewCard(c) + planCard(c);
+      var inf = q.groupsInfo[i];
+      return '<div class="lrow"><span class="k">' + esc(g.width) + ' × ' + esc(Calc.depthLabel(g)) + ' cm<small>' + esc(g.count) + ' ks · ' + Calc.treadType(g).label.toLowerCase() + ' · ' + (g.coverRiser ? 'podstupnice ' + esc(g.riserHeight) + ' cm' : 'bez podstupnice') +
+        (inf ? ' · výrobní plocha ' + m2(inf.prod) : '') + '</small>' + (inf && inf.needsJoint ? JOINT : '') + '</span><span class="v">' + m2(q.areas[i]) + '</span></div>';
+    }).join('') + lr('Celková plocha (naměřená)', '', m2(q.totalArea), 'tot') + (q.legacy ? '' : lr('Výrobní plocha vinylu', 'vč. přídavků na ořez', m2(q.prodArea)) + lr('Plocha MDF', '', m2(q.mdfArea))) +
+      lr('Typ schodiště', '', Calc.stairType(c).label) + '</div>' + viewCard(c) + planCard(c);
+    html += trimCard(c, q);
     // sleva a DPH
     html += '<div class="section-title">Sleva a DPH</div><div class="card"><div class="lbl">Sleva</div><div class="disc-grid"><div class="seg" role="group" aria-label="Typ slevy"><button type="button"' + dis + ' data-click="discType" data-type="pct" class="' + (c.discount.type === 'pct' ? 'on' : '') + '">%</button><button type="button"' + dis + ' data-click="discType" data-type="czk" class="' + (c.discount.type === 'czk' ? 'on' : '') + '">Kč</button></div>' +
       '<input type="text" inputmode="decimal" id="discVal"' + dis + ' aria-label="Výše slevy" value="' + esc(c.discount.value || '') + '" placeholder="0" data-input="discount"></div><div class="err" id="discErr"></div>' +
@@ -354,7 +399,7 @@
       lr('Zákazník', '', esc(c.job.customer || '—')) + (c.job.address ? lr('Adresa', '', '<span style="white-space:normal">' + esc(c.job.address) + '</span>') : '') +
       (c.job.note ? lr('Poznámka', '', '<span style="white-space:normal;font-weight:400">' + esc(c.job.note) + '</span>') : '') +
       '<div class="firm">' + (owner.logo ? '<img src="' + owner.logo + '" alt="Logo">' : '') + '<div><b>' + esc(owner.company || owner.name || 'Vaše firma') + '</b><div class="small muted">' + [owner.name, owner.ico ? 'IČO ' + owner.ico : '', owner.phone].filter(Boolean).map(esc).join(' · ') + '</div></div></div></div>';
-    html += A.question('labor');
+    html += A.question('labor') + A.question('laborHours') + A.question('extras');
     if (c.number && !inWizard) html += A.question('editPrices');
     return html;
   }
@@ -377,20 +422,37 @@
   A.on('input', 'extra', function (el) { if (ro()) return;
     var c = W.c; c.extras = c.extras || {}; c.extras[el.dataset.k] = el.value; touch(c); refreshCalc();
   });
+  function qtyText(l) {
+    var t = nf.format(l.qty) + ' ' + l.unit;
+    if (l.unit === 'paušál') return 'paušál';
+    return l.unitPrice && l.unit !== 'ks' ? t + ' × ' + fmtUnit(l.unitPrice) : t;
+  }
+  function missingAlert(q) {
+    return q.missing && q.missing.length ? '<div class="alert warn"><b>Cena není kompletní:</b> chybí ' + q.missing.map(esc).join(', ') + '. Doplní správce v Sazbách.' + A.question('hourlyRate') + '</div>' : '';
+  }
   function sums(c) {
-    var pr = A.pricingOf(c), pat = Calc.findPattern(pr, c.patternId), q = A.quoteOf(c), r = pr.rates;
-    var h = '<div class="list">' +
-      lr('Materiál vč. prořezu', m2(q.totalArea) + ' × ' + (1 + pat.wastePct / 100).toLocaleString('cs-CZ') + ' × ' + fmt(pat.materialPerM2), fmt(q.material)) +
-      (q.mdf ? lr('Podklad MDF', m2(q.totalArea), fmt(q.mdf)) : '') + (q.glue ? lr('Lepidlo', m2(q.totalArea), fmt(q.glue)) : '') +
-      lr('Práce', q.treads + ' nášlapů × ' + fmt(pat.laborPerTread), fmt(q.labor)) + (q.laborM2 ? lr('Práce za m²', m2(q.totalArea), fmt(q.laborM2)) : '') +
-      lr('Obklad podstupnic', q.riserTreads + ' ks × ' + fmt(r.riserSurcharge), fmt(q.risers)) +
-      (q.treadTypes ? lr('Příplatek za typ nášlapu', '', fmt(q.treadTypes)) : '') +
-      lr('Doprava', '', fmt(q.transport));
-    if (r.extrasEnabled && q.extras) h += lr('Volitelné příplatky', '', fmt(q.extras));
+    var pr = A.pricingOf(c), q = A.quoteOf(c), r = pr.rates;
+    var h = missingAlert(q) + '<div class="list">' + q.lines.map(function (l) {
+      return lr(esc(l.label), qtyText(l) + (l.sub ? ' · ' + esc(l.sub) : ''), fmt(l.amount));
+    }).join('');
     if (q.discountAmount > 0) h += lr('Mezisoučet', '', fmt(q.subtotal)) + lr('Sleva', c.discount.type === 'pct' ? Calc.n0(c.discount.value) + ' %' : '', '− ' + fmt(q.discountAmount), 'minus');
     h += lr('Cena bez DPH', '', fmt(q.base), 'tot') + lr('DPH ' + pct(c.vatRate), '', fmt(q.vat)) + lr('Celkem s DPH', r.roundTo > 1 ? 'zaokrouhleno na ' + r.roundTo + ' Kč' : '', fmt(q.total), 'tot') + '</div>';
     return h;
   }
+  // ruční přepis délky lišty a hrany (prázdné = automaticky podle stran schodiště)
+  function trimCard(c, q) {
+    if (q.legacy) return '';
+    var d = ro(c) ? ' disabled' : '';
+    function f(k, label, auto, val) {
+      return '<div class="field"><label for="bm_' + k + '">' + label + '</label><div class="inline-unit"><input type="text" id="bm_' + k + '" inputmode="decimal"' + d + ' value="' + esc(val === undefined || val === null ? '' : val) + '" placeholder="' + nf.format(auto) + '" data-input="bm" data-k="' + k + '"><span>bm</span></div></div>';
+    }
+    return '<div class="section-title">Lišty a hrany</div><div class="card"><p class="small muted">Délka se počítá z naměřených rozměrů podle stran schodiště. Prázdné pole = automaticky, vyplněním hodnotu přepíšete.</p>' +
+      '<div class="group-grid">' + f('trimBm', 'Lišta KPV50', q.autoTrimBm, c.trimBm) + f('edgeBm', 'Vinylová hrana', q.autoEdgeBm, c.edgeBm) + '</div>' + A.question('discountTrims') + '</div>';
+  }
+  A.on('input', 'bm', function (el) { if (ro()) return;
+    var c = W.c; if (el.value.trim() === '') delete c[el.dataset.k]; else c[el.dataset.k] = el.value;
+    touch(c); refreshCalc();
+  });
   A.on('click', 'vat', function (el) {
     if (ro()) return; W.c.vatRate = parseFloat(el.dataset.v); touch(W.c);
     document.querySelectorAll('[data-click=vat]').forEach(function (b) { b.classList.toggle('on', b === el); });
@@ -405,7 +467,7 @@
   function applyDiscount() {
     var c = W.c, d = c.discount, raw = A.$('#discVal').value, v = Calc.num(raw), msg = '';
     if (raw.trim() !== '') {
-      var sub = Calc.computeQuote(c.groups, c.patternId, A.pricingOf(c), { type: 'czk', value: 0 }, c.vatRate, c.extras).subtotal;
+      var sub = Calc.computeQuote(c.groups, c.patternId, A.pricingOf(c), { type: 'czk', value: 0 }, c.vatRate, c.extras, A.quoteOpt(c)).subtotal;
       if (isNaN(v) || v < 0) msg = 'Zadejte číslo 0 nebo větší';
       else if (d.type === 'pct' && v > 100) msg = 'Sleva v % musí být 0–100';
       else if (d.type === 'czk' && v > sub) msg = 'Sleva nesmí být vyšší než cena (' + fmt(sub) + ')';
@@ -500,14 +562,19 @@
       '<span class="small">' + [owner.name, owner.ico ? 'IČO ' + owner.ico : '', owner.phone].filter(Boolean).map(esc).join('<br>') + '</span></div>' +
       '<div class="right"><h1>Kalkulace č. ' + esc(c.number) + '</h1><div>Datum: ' + A.fmtDate(c.createdAt) + '</div></div></div><hr>' +
       '<dl class="pdf-meta"><dt>Zakázka</dt><dd>' + esc(c.job.name) + '</dd><dt>Zákazník</dt><dd>' + esc(c.job.customer || '—') + '</dd>' + (c.job.address ? '<dt>Adresa</dt><dd>' + esc(c.job.address) + '</dd>' : '') + '<dt>Schodiště</dt><dd>' + Calc.stairType(c).label + '</dd></dl>' +
-      '<div class="pat-line"><img src="' + A.patternImg(pat) + '" alt=""><div><b>' + esc(pat.name) + '</b><br><span class="small">' + fmt(pat.materialPerM2) + ' / m², prořez ' + pat.wastePct + ' %</span></div></div>' +
+      '<div class="pat-line"><img src="' + A.patternImg(pat) + '" alt=""><div><b>' + esc(pat.name) + '</b><br><span class="small">' + fmtUnit(Calc.patternPrice(pr, pat, c.formatId)) + ' / m², prořez ' + nf1.format(q.wastePct) + ' %</span></div></div>' +
+      (q.missing && q.missing.length ? '<div class="alert warn">Cena není kompletní: chybí ' + q.missing.map(esc).join(', ') + '.</div>' : '') + (q.needsJoint ? '<p class="small">' + JOINT + ' Šířka schodu je větší než délka lamely.</p>' : '') +
       '<table class="tbl"><thead><tr><th>Šířka</th><th>Hloubka</th><th>Nášlap</th><th>Podstupnice</th><th class="num">Počet</th><th class="num">Plocha</th></tr></thead><tbody>' +
       c.groups.map(function (g, i) { return '<tr><td>' + esc(g.width) + ' cm</td><td>' + esc(Calc.depthLabel(g)) + ' cm</td><td>' + Calc.treadType(g).label.toLowerCase() + '</td><td>' + (g.coverRiser ? esc(g.riserHeight) + ' cm' : 'bez obkladu') + '</td><td class="num">' + esc(g.count) + ' ks</td><td class="num">' + m2(q.areas[i]) + '</td></tr>'; }).join('') +
-      '<tr><td colspan="5"><b>Celkem</b></td><td class="num"><b>' + m2(q.totalArea) + '</b></td></tr></tbody></table>' +
+      '<tr><td colspan="5"><b>Celkem (naměřená plocha)</b></td><td class="num"><b>' + m2(q.totalArea) + '</b></td></tr>' +
+      (q.legacy ? '' : '<tr><td colspan="5">Výrobní plocha vinylu (vč. přídavků)</td><td class="num">' + m2(q.prodArea) + '</td></tr><tr><td colspan="5">Plocha MDF</td><td class="num">' + m2(q.mdfArea) + '</td></tr>') + '</tbody></table>' +
       '<div class="plan view3d">' + viewHtml(c) + '</div><div class="plan">' + planHtml(c) + '</div>' +
-      '<table class="tbl"><tbody>' + row('Materiál vč. prořezu', fmt(q.material)) + (q.mdf ? row('Podklad MDF', fmt(q.mdf)) : '') + (q.glue ? row('Lepidlo', fmt(q.glue)) : '') + row('Práce', fmt(q.labor)) + (q.laborM2 ? row('Práce za m²', fmt(q.laborM2)) : '') + row('Obklad podstupnic', fmt(q.risers)) + (q.treadTypes ? row('Příplatek za typ nášlapu', fmt(q.treadTypes)) : '') + row('Doprava', fmt(q.transport)) +
-      (r.extrasEnabled && q.extras ? row('Volitelné příplatky', fmt(q.extras)) : '') +
-      (q.discountAmount ? row('Sleva', '− ' + fmt(q.discountAmount)) : '') + row('Cena bez DPH', fmt(q.base), true) + row('DPH ' + pct(c.vatRate), fmt(q.vat)) + '</tbody></table>' +
+      '<table class="tbl"><thead><tr><th>Položka</th><th class="num">Množství</th><th class="num">Jedn. cena</th><th class="num">Částka</th></tr></thead><tbody>' +
+      q.lines.map(function (l) {
+        return '<tr><td>' + esc(l.label) + (l.sub ? '<br><span class="small muted">' + esc(l.sub) + '</span>' : '') + '</td><td class="num">' + nf.format(l.qty) + ' ' + esc(l.unit) + '</td><td class="num">' + (l.unitPrice ? fmtUnit(l.unitPrice) : '') + '</td><td class="num">' + fmt(l.amount) + '</td></tr>';
+      }).join('') +
+      (q.discountAmount ? '<tr><td colspan="3">Sleva</td><td class="num">− ' + fmt(q.discountAmount) + '</td></tr>' : '') +
+      '<tr><td colspan="3"><b>Cena bez DPH</b></td><td class="num"><b>' + fmt(q.base) + '</b></td></tr><tr><td colspan="3">DPH ' + pct(c.vatRate) + '</td><td class="num">' + fmt(q.vat) + '</td></tr></tbody></table>' +
       '<div class="pdf-total"><span><b>Celkem s DPH</b></span><span class="v">' + fmt(q.total) + '</span></div>' +
       '<div class="pdf-foot">Vygenerováno v prototypu. V ostré verzi PDF vytváří server. Cena platí dle ceníku k ' + A.fmtDate(c.createdAt) + '.</div></div></div>';
     A.render(sheet, { title: 'Náhled PDF', back: '#/calc/' + c.id, bar: '<div class="actionbar stickybar no-print"><div class="inner"><div class="btns">' + backBtn('#/calc/' + c.id) + '<button class="btn primary" data-click="print">' + ic('print') + 'Tisk / Uložit jako PDF</button></div></div></div>' });
@@ -522,8 +589,8 @@
     var pr = A.pricingOf(c);
     if (!c.patternId) return A.go('/wizard/' + c.id + '/2');
     // porovnávají se vzory ze stejné kolekce jako vybraný vzor
-    pr = { patterns: Store.sameCollection(pr.patterns, c.patternId), rates: pr.rates };
-    var cmp = Calc.comparePatterns(c.groups, pr, c.discount, c.vatRate, c.extras);
+    pr = { patterns: Store.sameCollection(pr.patterns, c.patternId), rates: pr.rates, collections: pr.collections };
+    var cmp = Calc.comparePatterns(c.groups, pr, c.discount, c.vatRate, c.extras, A.quoteOpt(c));
     var min = Math.min.apply(null, cmp.map(function (x) { return x.quote.total; }));
     var back = c.number || ro(c) ? '#/calc/' + c.id : '#/wizard/' + c.id + '/2';
     function use(x) {
@@ -533,14 +600,14 @@
     A.render('<h1 class="large-title">Porovnání vzorů</h1><p class="screen-sub">' + esc(c.job.name) + ' · ' + m2(cmp[0].quote.totalArea) + ' · DPH ' + pct(c.vatRate) + (c.discount.value ? ' · sleva ' + esc(c.discount.value) + (c.discount.type === 'pct' ? ' %' : ' Kč') : '') + (c.snapshot ? ' · ceny z ' + A.fmtDate(c.createdAt) : '') + '</p>' +
       '<div class="list only-mobile">' + cmp.map(function (x) {
         var best = x.quote.total === min, diff = x.quote.total - min;
-        return '<div class="cmp-row' + (best ? ' best' : '') + '"><img src="' + A.patternImg(x.pattern) + '" alt=""><div class="nm"><b>' + esc(x.pattern.name) + '</b><span class="small muted">' + fmt(x.pattern.materialPerM2) + '/m² · prořez ' + x.pattern.wastePct + '&nbsp;%</span></div>' +
+        return '<div class="cmp-row' + (best ? ' best' : '') + '"><img src="' + A.patternImg(x.pattern) + '" alt=""><div class="nm"><b>' + esc(x.pattern.name) + '</b><span class="small muted">' + fmtUnit(Calc.patternPrice(pr, x.pattern, c.formatId)) + '/m² · prořez ' + nf1.format(x.quote.wastePct) + '&nbsp;%</span>' + (x.quote.needsJoint ? JOINT : '') + '</div>' +
           '<div class="pr"><b>' + fmt(x.quote.total) + '</b><small>' + (best ? '<span class="badge st-přijato">Nejlevnější</span>' : '+ ' + fmt(diff)) + '</small></div>' +
           '<div class="use">' + use(x) + '</div></div>';
       }).join('') + '</div>' +
       '<div class="card only-desktop" style="overflow:auto"><table class="tbl"><thead><tr><th>Vzor</th><th class="num">Materiál</th><th class="num">Práce</th><th class="num">Podstupnice</th><th class="num">Doprava</th><th class="num">Bez DPH</th><th class="num">S DPH</th><th class="num">Rozdíl</th><th></th></tr></thead><tbody>' +
       cmp.map(function (x) {
         var q = x.quote;
-        return '<tr class="' + (q.total === min ? 'best' : '') + '"><td><img class="thumb" src="' + A.patternImg(x.pattern) + '" alt=""><b>' + esc(x.pattern.name) + '</b>' + (q.total === min ? ' <span class="badge st-přijato">Nejlevnější</span>' : '') + '</td><td class="num">' + fmt(q.material) + '</td><td class="num">' + fmt(q.labor) + '</td><td class="num">' + fmt(q.risers) + '</td><td class="num">' + fmt(q.transport) + '</td><td class="num">' + fmt(q.base) + '</td><td class="num"><b>' + fmt(q.total) + '</b></td><td class="num">' + (q.total === min ? '—' : '+ ' + fmt(q.total - min)) + '</td><td>' + use(x) + '</td></tr>';
+        return '<tr class="' + (q.total === min ? 'best' : '') + '"><td><img class="thumb" src="' + A.patternImg(x.pattern) + '" alt=""><b>' + esc(x.pattern.name) + '</b>' + (q.total === min ? ' <span class="badge st-přijato">Nejlevnější</span>' : '') + (q.needsJoint ? JOINT : '') + '</td><td class="num">' + fmt(q.material) + '</td><td class="num">' + fmt(q.labor) + '</td><td class="num">' + fmt(q.risers) + '</td><td class="num">' + fmt(q.transport) + '</td><td class="num">' + fmt(q.base) + '</td><td class="num"><b>' + fmt(q.total) + '</b></td><td class="num">' + (q.total === min ? '—' : '+ ' + fmt(q.total - min)) + '</td><td>' + use(x) + '</td></tr>';
       }).join('') + '</tbody></table></div>', { wide: true, title: 'Porovnání vzorů', back: back, bare: false });
   });
   A.on('click', 'usePattern', function (el) { if (ro()) return;

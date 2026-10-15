@@ -9,6 +9,7 @@ var Store = (function () {
   function seed() {
     var d = {
       patterns: clone(DEFAULTS.patterns),
+      collections: clone(DEFAULTS.collections),
       rates: clone(DEFAULTS.rates),
       users: clone(DEFAULTS.users),
       tokens: {},
@@ -21,12 +22,32 @@ var Store = (function () {
     var t = Date.now() - c.daysAgo * 86400000 - (c.daysAgo ? 3600000 * 2 : 0);
     var k = clone(c); delete k.daysAgo;
     k.createdAt = t; k.updatedAt = t;
-    k.snapshot = k.number ? { patterns: clone(sameCollection(DEFAULTS.patterns, k.patternId)), rates: clone(DEFAULTS.rates) } : null;
+    k.snapshot = k.number ? { patterns: clone(sameCollection(DEFAULTS.patterns, k.patternId)), rates: clone(DEFAULTS.rates), collections: clone(DEFAULTS.collections) } : null;
     return k;
   }
 
+  // jednorázová migrace starších uložených dat na ceník po kolekcích; snapshoty kalkulací se nemění (počítají postaru)
+  function migrate(d) {
+    if (d.collections) return false;
+    d.collections = clone(DEFAULTS.collections);
+    var seed = {};
+    DEFAULTS.patterns.forEach(function (p) { seed[p.id] = p; });
+    d.patterns.forEach(function (p) {
+      var s = seed[p.id];
+      if (!s) { p.collectionId = null; p.variant = 'glued'; p.priceOverride = null; p.active = false; return; }
+      p.collectionId = s.collectionId; p.variant = s.variant; p.priceOverride = null; p.active = s.active;
+    });
+    var r = d.rates, def = DEFAULTS.rates;
+    ['mdf', 'eur', 'glue', 'reserve', 'labor', 'trimPerBm', 'edgePerBm', 'allowance', 'nose', 'wasteMode', 'variants'].forEach(function (k) {
+      if (r[k] === undefined) r[k] = clone(def[k]);
+    });
+    if (r.extras) r.extras = r.extras.filter(function (x) { return x.key !== 'edges' && x.key !== 'trims'; });
+    return true;
+  }
+
   function load() {
-    try { var raw = localStorage.getItem(KEY); if (raw) { db = JSON.parse(raw); if (db && db.users) { if (!db.rates.m2) { db.rates.m2 = clone(DEFAULTS.rates.m2); db.rates.treadSurcharge = db.rates.treadSurcharge || clone(DEFAULTS.rates.treadSurcharge); save(); }
+    try { var raw = localStorage.getItem(KEY); if (raw) { db = JSON.parse(raw); if (db && db.users) { if (migrate(db)) save();
+      if (!db.rates.m2) { db.rates.m2 = clone(DEFAULTS.rates.m2); db.rates.treadSurcharge = db.rates.treadSurcharge || clone(DEFAULTS.rates.treadSurcharge); save(); }
       // ukázka točitého schodiště přibyla později – doplní se i do už uložených dat (jednou)
       if (!db.demoWinder) { db.demoWinder = 1; if (!calcById('c6')) db.calculations.push(seedCalc(DEFAULTS.calculations.filter(function (c) { return c.id === 'c6'; })[0])); save(); }
       return db; } } } catch (e) { /* poškozená data */ }
@@ -76,20 +97,20 @@ var Store = (function () {
     });
     return y + '-' + String(max + 1).padStart(4, '0');
   }
-  function currentPricing() { return clone({ patterns: db.patterns, rates: db.rates }); }
+  function currentPricing() { return clone({ patterns: db.patterns, rates: db.rates, collections: db.collections }); }
   // vzory ze stejné kolekce jako vybraný vzor – jen ty jdou do snapshotu (stovky vzorů by zaplnily úložiště) a do porovnání
   function sameCollection(patterns, patternId) {
     var sel = patterns.filter(function (p) { return p.id === patternId; })[0];
     return sel ? patterns.filter(function (p) { return p.kolekce === sel.kolekce; }) : [];
   }
-  function snapshotFor(patternId) { return clone({ patterns: sameCollection(db.patterns, patternId), rates: db.rates }); }
+  function snapshotFor(patternId) { return clone({ patterns: sameCollection(db.patterns, patternId), rates: db.rates, collections: db.collections }); }
   function newCalc(user) {
     var now = Date.now();
     return {
       id: uid('c'), ownerId: user.id, number: null, createdAt: now, updatedAt: now, status: 'koncept', sentTo: null,
       job: { name: '', customer: '', address: '', note: '' },
       stairType: 'straight', groups: [newGroup()], patternId: null, discount: { type: 'pct', value: 0 }, vatRate: db.rates.vatDefault,
-      extras: {}, snapshot: null
+      extras: {}, stairSide: 'walls', snapshot: null
     };
   }
   // výchozí hodnoty = typické rozměry (zrychlení cíle "do 2 minut")
@@ -108,6 +129,6 @@ var Store = (function () {
     setSession: setSession, clearSession: clearSession, currentUser: currentUser,
     userById: userById, userByEmail: userByEmail,
     calcById: calcById, calcsFor: calcsFor, canSee: canSee, upsertCalc: upsertCalc, nextNumber: nextNumber,
-    currentPricing: currentPricing, sameCollection: sameCollection, snapshotFor: snapshotFor, newCalc: newCalc, newGroup: newGroup, makeToken: makeToken
+    currentPricing: currentPricing, migrate: migrate, sameCollection: sameCollection, snapshotFor: snapshotFor, newCalc: newCalc, newGroup: newGroup, makeToken: makeToken
   };
 })();
