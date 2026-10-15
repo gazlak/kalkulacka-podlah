@@ -383,11 +383,12 @@ var App = (function () {
     });
     var html = items.map(function (x) {
       var c = x.c, href = c.number || c.ownerId !== user.id ? '#/calc/' + c.id : '#/wizard/' + c.id + '/1';
-      return '<a class="hist-card" href="' + href + '"><div class="top"><div><div class="name">' + esc(c.job.name || 'Bez názvu') + '</div>' +
+      var edit = c.ownerId === user.id ? '<a class="hist-edit" href="#/wizard/' + c.id + '/1">' + A.icon('edit', 'sm') + 'Upravit</a>' : '';
+      return '<div class="hist-card"><div class="top"><div><a class="name hist-link" href="' + href + '">' + esc(c.job.name || 'Bez názvu') + '</a>' +
         '<div class="small muted">' + esc(c.job.customer || 'bez zákazníka') + ' · ' + A.fmtDate(c.updatedAt) + '</div></div>' +
         '<div class="price">' + (x.total === null ? '—' : fmt(x.total)) + '</div></div>' +
         (user.role === 'admin' && c.ownerId !== user.id ? '<div class="who">' + A.icon('user', 'sm') + esc(ownerName(c)) + '</div>' : '') +
-        '<div class="foot"><span class="dot st-' + c.status + '">' + A.statusLabel(c.status) + '</span><span>' + (c.number ? 'č. ' + esc(c.number) : 'rozpracováno') + '</span></div></a>';
+        '<div class="foot"><span class="dot st-' + c.status + '">' + A.statusLabel(c.status) + '</span><span class="end"><span>' + (c.number ? 'č. ' + esc(c.number) : 'rozpracováno') + '</span>' + edit + '</span></div></div>';
     }).join('');
     A.$('#hlist').innerHTML = html || '<div class="empty"><svg class="ic art" aria-hidden="true"><use href="#i-inbox"/></svg>' + (all.length ? '<p>Nic nenalezeno.<br>Zkuste upravit hledání nebo filtr.</p>' : '<p>Zatím nemáte žádnou kalkulaci.</p><a class="btn primary" href="#/new">' + A.icon('plus') + 'Vytvořit první kalkulaci</a>') + '</div>';
   }

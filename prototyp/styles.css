@@ -171,7 +171,7 @@ body.has-bar main { padding-bottom: calc(150px + var(--safe-b)); }
 .btn .ic { width: 18px; height: 18px; }
 .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-2); }
 .btn-grid .btn { min-width: 0; }
-.btn:focus-visible, .icon-btn:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, .tabbar a:focus-visible, .chip:focus-visible, .lrow:focus-visible, .seg button:focus-visible, .tile:focus-within, .qchip:focus-visible, .hist-card:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
+.btn:focus-visible, .icon-btn:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, .tabbar a:focus-visible, .chip:focus-visible, .lrow:focus-visible, .seg button:focus-visible, .tile:focus-within, .qchip:focus-visible, .hist-card:focus-within { outline: 3px solid var(--ring); outline-offset: 2px; }
 
 /* ---------- karty a seskupené seznamy ---------- */
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: var(--s-4); margin-bottom: var(--s-4); box-shadow: var(--shadow-1); }
@@ -402,11 +402,17 @@ table.tbl tr.best td { background: var(--ok-soft); }
 .search { position: relative; flex: 1; }
 .search .ic { position: absolute; left: var(--s-3); top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
 .search input { padding-left: 42px; border-radius: var(--r-pill); }
-.hist-card { display: block; text-decoration: none; color: inherit; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: var(--s-4); margin-bottom: var(--s-3); box-shadow: var(--shadow-1); transition: border-color .15s, transform .15s; }
+.hist-card { position: relative; display: block; color: inherit; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: var(--s-4); margin-bottom: var(--s-3); box-shadow: var(--shadow-1); transition: border-color .15s, transform .15s; }
 .hist-card:hover { border-color: var(--line-strong); }
 .hist-card:active { transform: scale(.99); }
 .hist-card .top { display: flex; justify-content: space-between; gap: var(--s-3); align-items: flex-start; }
 .hist-card .name { font-weight: 700; line-height: 1.3; }
+.hist-link { color: inherit; text-decoration: none; outline: none; }
+.hist-link::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
+.hist-card .end { display: flex; align-items: center; gap: var(--s-3); }
+.hist-edit { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border: 1px solid var(--line-strong); border-radius: var(--r-pill); color: var(--text); text-decoration: none; font-weight: 600; }
+.hist-edit:hover { border-color: var(--text); }
+.hist-edit:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
 .hist-card .price { font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .hist-card .who { margin-top: var(--s-2); color: var(--muted); font-size: var(--fs-sm); display: flex; gap: 6px; align-items: center; }
 .hist-card .foot { display: flex; justify-content: space-between; align-items: center; gap: var(--s-2); margin-top: var(--s-3); font-size: var(--fs-sm); color: var(--muted); }
