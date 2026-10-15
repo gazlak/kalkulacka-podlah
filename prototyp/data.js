@@ -1,15 +1,57 @@
 /* Seed data (DEFAULTS). Sazby, uživatelé a kalkulace jsou VYMYŠLENÉ – ukázková data pro prototyp.
  * Za běhu se čte výhradně ze Store (localStorage); DEFAULTS slouží jen jako seed. */
+// kolekce vinylu Šesták: MOC bez DPH (Kč/m²) a rozměr lamely/dlaždice v mm. Design Stone A/B/C jsou formáty téže kolekce (family).
+var DEFAULT_COLLECTIONS = [
+  { id: 'authentic-oak', no: 1, name: 'Authentic Oak 0,55', materialPerM2: 696, lamellaLengthMm: 1219.2, lamellaWidthMm: 228.6 },
+  { id: 'dv-home', no: 2, name: 'Design Vinyl Home 0,3', materialPerM2: 496, lamellaLengthMm: 1219.2, lamellaWidthMm: 228.6 },
+  { id: 'dv-extreme', no: 3, name: 'Design Vinyl Extreme 0,55', materialPerM2: 626, lamellaLengthMm: 1219.2, lamellaWidthMm: 228.6 },
+  { id: 'grandissimo', no: 4, name: 'Grandissimo 0,55', materialPerM2: 726, lamellaLengthMm: 1524, lamellaWidthMm: 228.6 },
+  { id: 'grandissimo-plus', no: 5, name: 'Grandissimo Plus 0,55', materialPerM2: 726, lamellaLengthMm: 1524, lamellaWidthMm: 228 },
+  { id: 'bellissimo', no: 6, name: 'Bellissimo 0,5', materialPerM2: 580, lamellaLengthMm: 1227, lamellaWidthMm: 187 },
+  { id: 'xl-03', no: 7, name: 'XL 0,3', materialPerM2: 626, lamellaLengthMm: 1524, lamellaWidthMm: 228.6 },
+  { id: 'xl-04', no: 8, name: 'XL 0,4', materialPerM2: 648, lamellaLengthMm: 1524, lamellaWidthMm: 228.6 },
+  { id: 'xl-055', no: 9, name: 'XL 0,55', materialPerM2: 668, lamellaLengthMm: 1524, lamellaWidthMm: 228.6 },
+  { id: 'style-floor', no: 10, name: 'Style Floor', materialPerM2: 546, lamellaLengthMm: 1219.2, lamellaWidthMm: 228.6 },
+  { id: 'grand-floor', no: 11, name: 'Grand Floor 0,4', materialPerM2: 646, lamellaLengthMm: 1524, lamellaWidthMm: 228.6 },
+  { id: 'design-stone-a', no: 12, name: 'Design Stone 0,55 A', materialPerM2: 746, lamellaLengthMm: 914.4, lamellaWidthMm: 457.2, family: 'design-stone', format: 'A' },
+  { id: 'design-stone-b', no: 13, name: 'Design Stone 0,55 B', materialPerM2: 746, lamellaLengthMm: 609.6, lamellaWidthMm: 609.6, family: 'design-stone', format: 'B' },
+  { id: 'design-stone-c', no: 14, name: 'Design Stone 0,55 C', materialPerM2: 746, lamellaLengthMm: 914.4, lamellaWidthMm: 914.4, family: 'design-stone', format: 'C' },
+  { id: 'grand-stone', no: 15, name: 'Grand Stone 0,4', materialPerM2: 599, lamellaLengthMm: 914.4, lamellaWidthMm: 457.2 }
+].map(function (c) { c.active = true; return c; });
+
+// párování dekoru na kolekci podle názvu kolekce z e-shopu (r[1]); od nejkonkrétnějšího pravidla, null = bez kolekce (skryto)
+var COLLECTION_RULES = [
+  [/DESIGN STONE/, 'design-stone-a'], [/GRANDISSIMO PLUS/, 'grandissimo-plus'], [/GRANDISSIMO/, 'grandissimo'],
+  [/AUTHENTIC OAK/, 'authentic-oak'], [/DESIGN VINYL EXTREME/, 'dv-extreme'], [/DESIGN VINYL HOME/, 'dv-home'], [/BELLISSIMO/, 'bellissimo'],
+  [/XL LARGE/, null], [/KOLEKCE XL 0,55|XL CLICK 0,55/, 'xl-055'], [/^XL .*0,3/, 'xl-03'], [/^XL .*0,4/, 'xl-04'],
+  [/STYLE FLOOR/, 'style-floor'], [/GRAND FLOOR/, 'grand-floor'], [/GRAND STONE/, 'grand-stone']
+];
+function collectionIdFor(kolekce) {
+  for (var i = 0; i < COLLECTION_RULES.length; i++) if (COLLECTION_RULES[i][0].test(kolekce)) return COLLECTION_RULES[i][1];
+  return null;
+}
+
 var DEFAULTS = {
-  // vzory = dekory Floor Forever (patterns.js). Cena za m² je jen orientační střed cenového pásma z e-shopu (priceEst),
-  // dekor bez pásma má 0 = cena nezadána; skutečné ceny doplní správce. Prořez a práce za nášlap jsou ukázkové.
+  // vzory = dekory Floor Forever (patterns.js). Cenu za m² dědí z kolekce (collectionId), případně ji přepíše priceOverride.
+  // Dekor bez kolekce (dřevo, laminát, Economy, Primero, Divino, XL Large) je neaktivní, ale nemaže se.
+  collections: DEFAULT_COLLECTIONS,
   patterns: FF_PATTERNS.map(function (r, i) {
-    var mid = { '0-500': 400, '500-900': 700, '900-1500': 1200, '1500-2500': 2000 }[r[4]] || 0;
+    var cid = r[0] === 'vinyl' ? collectionIdFor(r[1]) : null;
     return { id: i + 1, name: r[2], typ: r[0], kolekce: r[1], barva: r[3], texture: r[0] === 'laminat' ? 'laminate' : 'planks', tint: '#c9a266',
-      photo: FF_IMG + r[5], materialPerM2: mid, priceEst: true, wastePct: 10, laborPerTread: 450 };
+      photo: FF_IMG + r[5], collectionId: cid, variant: /CLICK/.test(r[2]) ? 'click' : 'glued', priceOverride: null, active: !!cid, wastePct: 10 };
   }),
   rates: {
+    // STARÁ pole (riserSurcharge, m2.byTread, extras edges/trims) čte jen legacy cesta výpočtu; nová cesta je nečte
     riserSurcharge: 250, transport: 1500,
+    mdf: { thicknessMm: 12, eurPerM3: 375 }, eur: { rate: 25, changedAt: Date.now() },
+    glue: { czkPerKg: 324, gPerM2: 300, layers: 1 },
+    reserve: { pct: 5, onVinyl: false },
+    labor: { hourly: null, hoursByTread: { nose: 1, flat: 1, landingNose: 1, landingFlat: 1 }, riserHours: 1 },
+    trimPerBm: 99, edgePerBm: null,
+    allowance: { width: 3, depth: 3, riser: 3 },
+    nose: { mdfOverhangMm: 0, mdfWrapMm: 0, vinylOverhangMm: 0, vinylWrapMm: 0 },
+    wasteMode: 'lamellas',
+    variants: { glued: true, click: true },
     // příplatek podle typu nášlapu (Kč/nášlap) – zatím bez vstupů, proto 0
     treadSurcharge: { nose: 0, flat: 0, landingNose: 0, landingFlat: 0 },
     // složky ceny za m² podle typu nášlapu: podklad MDF (tloušťka v mm × cena za m³ v EUR × kurz), lepidlo a práce za m²
@@ -24,8 +66,6 @@ var DEFAULTS = {
     vatDefault: 0.21, vatOptions: [0.21, 0.12], roundTo: 1,
     extrasEnabled: false,
     extras: [
-      { key: 'edges',   label: 'Schodové hrany',   unit: 'bm', price: 180 },
-      { key: 'trims',   label: 'Lišty',            unit: 'bm', price: 120 },
       { key: 'removal', label: 'Demontáž starého krytu', unit: 'nášlap', price: 90 },
       { key: 'leveling', label: 'Vyrovnání podkladu',    unit: 'nášlap', price: 110 }
     ]

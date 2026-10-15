@@ -19,8 +19,10 @@ var App = (function () {
   A.timer = function (id) { timers.push(id); };
   A.patternImg = function (p) { return p.photo || Textures.uri(p.texture, p.tint); };
   A.pricingOf = function (c) { return c.snapshot || Store.currentPricing(); };
+  // volby kalkulace pro novou cestu výpočtu (strana ke zdi / otevřená, ruční bm lišty a hrany, formát dlaždice)
+  A.quoteOpt = function (c) { return { stairSide: c.stairSide, trimBm: c.trimBm, edgeBm: c.edgeBm, formatId: c.formatId }; };
   A.quoteOf = function (c) {
-    return Calc.computeQuote(c.groups, c.patternId, A.pricingOf(c), c.discount, c.vatRate, c.extras);
+    return Calc.computeQuote(c.groups, c.patternId, A.pricingOf(c), c.discount, c.vatRate, c.extras, A.quoteOpt(c));
   };
   A.icon = function (n, cls) { return '<svg class="ic' + (cls ? ' ' + cls : '') + '" aria-hidden="true"><use href="#i-' + n + '"/></svg>'; };
   A.statusLabel = function (s) { return s[0].toUpperCase() + s.slice(1); };
@@ -36,10 +38,24 @@ var App = (function () {
     { k: 'custContact', t: 'E-mail a telefon zákazníka', x: 'Krok Zakázka (3.) podle zadání neobsahuje e-mail ani telefon zákazníka, ale „Odeslat e-mailem“ e-mail potřebuje. Zatím se zadává až v okně odeslání. Přidat pole sem?' },
     { k: 'spiral', t: 'Točité / lichoběžníkové schody a podesty', x: 'Zadání počítá jen s obdélníkovými nášlapy. Jak řešit točité schody, zkosené nášlapy a podesty?' },
     { k: 'photos', t: 'Fotky vzorů', x: 'Ukázkové fotky jsou nahrazeny texturami. Správce nahraje skutečné fotky v administraci. Stačí jedna fotka na vzor?' },
-    { k: 'labor', t: 'Práce za kus vs. za m²', x: 'Práce se teď počítá za nášlap (Kč/ks). Účtuje podlahář práci spíš za nášlap, nebo za m²? Případně podle vzoru?' },
+    { k: 'labor', t: 'Práce: normohodiny', x: 'Nahrazeno normohodinami: práce = počet nášlapů × hodiny podle typu nášlapu × hodinová sazba, podstupnice zvlášť. Souhlasí takový model, nebo se má účtovat za m² / za kus?' },
+    { k: 'noseAllowance', t: 'Přídavek na nos', x: 'Kolik mm přesahu a ohybu (zalomení přes hranu) se pro nos počítá u MDF a u vinylu zvlášť? Zatím 0 mm – je to v Sazbách, sekce Nos.' },
+    { k: 'allowanceAll', t: 'Přídavky na ořez', x: 'Přídavek 3 cm na šířku, hloubku i podstupnici – platí pro všechny schody stejně, nebo se liší podle typu (podesta, šikmý schod)?' },
+    { k: 'glueLayers', t: 'Lepidlo: 1× nebo 2× nános', x: 'Lepí se jen vinyl na MDF (1×), nebo i MDF na podklad (2×)? Řeší přepínač v Sazbách.' },
+    { k: 'variants', t: 'Nabízené varianty', x: 'Má se nabízet LEPENÁ i CLICK varianta u všech kolekcí? V Kolekcích jde zapnout/vypnout každou zvlášť.' },
+    { k: 'mocPrice', t: 'MOC a cena pro podlaháře', x: 'Ceny v tabulce jsou doporučené (MOC) bez DPH. Počítá podlahář s MOC, nebo s vlastní nákupní cenou / slevou z ceníku?' },
+    { k: 'eurRate', t: 'Kurz EUR/CZK', x: 'Který kurz (ČNB, vlastní, pevný) a jak často se mění? Prototyp ukládá datum poslední změny hodnoty.' },
+    { k: 'lamellaJoint', t: 'Spoj lamel', x: 'Když je schod širší než lamela, musí se lamely nastavovat. Je to přípustné, nebo se má nabídnout jen kolekce s delší lamelou? Odřezky se zatím počítají do nastavení.' },
+    { k: 'laborHours', t: 'Normohodiny', x: 'Kolik hodin trvá obložení jednoho nášlapu (s nosem, bez nosu, podesta) a jedné podstupnice? Zatím 1 h pro všechno.' },
+    { k: 'hourlyRate', t: 'Hodinová sazba', x: 'Jaká je hodinová sazba práce? Dokud není zadaná, kalkulace ukazuje upozornění „Cena není kompletní“.' },
+    { k: 'edgePrice', t: 'Cena vinylové hrany', x: 'Kolik stojí vinylová hrana za bm? Cena zatím chybí.' },
+    { k: 'trimRoute', t: 'Vedení lišty a hrany', x: 'Lišta se vede u strany přiléhající ke zdi, hrana na otevřené straně. Odpovídá to praxi? Počítá se z naměřených rozměrů (hloubka strany + podstupnice).' },
+    { k: 'discountTrims', t: 'Sleva i na lišty?', x: 'Sleva se teď počítá z celé ceny včetně lišt, hran a dopravy. Má se vztahovat jen na materiál a práci?' },
+    { k: 'gplusWidth', t: 'Grandissimo Plus: šířka lamely', x: 'Podklady uvádějí 228 mm, možná 228,6 mm jako u ostatních kolekcí. Která hodnota platí?' },
     { k: 'vat', t: 'Je podlahář plátce DPH?', x: 'Kalkulace vždy ukazuje DPH. Má být cena s DPH i bez DPH pro neplátce skrytá, nebo se DPH dá vypnout?' },
     { k: 'editPrices', t: 'Upravit = staré ceny?', x: 'Má „Upravit“ u uložené kalkulace držet původní ceny (jak je to teď, dokud se ceník nezmění), nebo vždy nabídnout aktuální ceník?' },
-    { k: 'firmsPricing', t: 'Více firem s vlastním ceníkem?', x: 'Je ceník jeden společný pro všechny podlaháře, nebo má mít každá firma svůj? Prototyp má jeden ceník spravovaný adminem.' }
+    { k: 'firmsPricing', t: 'Více firem s vlastním ceníkem?', x: 'Je ceník jeden společný pro všechny podlaháře, nebo má mít každá firma svůj? Prototyp má jeden ceník spravovaný adminem.' },
+    { k: 'extras', t: 'Volitelné příplatky', x: 'Lišty a hrany jsou teď pevná součást ceny. Demontáž a vyrovnání podkladu zůstávají jako volitelné příplatky (vypnuto). Mají se účtovat, a jak?' }
   ];
   A.question = function (key) {
     var i = QUESTIONS.map(function (q) { return q.k; }).indexOf(key);

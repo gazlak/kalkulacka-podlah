@@ -561,3 +561,9 @@ body.has-bar #toast { bottom: calc(160px + var(--safe-b)); }
 .cmp-row .nm small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 699px) { .pdf-sheet .pdf-top .right { text-align: left; } }
 html { scroll-padding-top: 72px; scroll-padding-bottom: 180px; }
+
+/* ceník po kolekcích: varování ze spoje lamel, poznámka k rozměrům, import CSV */
+.joint { display: inline-block; margin: 2px 0 0 6px; padding: 1px 8px; border-radius: var(--r-pill); background: var(--warn-soft); color: var(--warn); font-size: var(--fs-xs); font-weight: 700; }
+.calc-note { margin-top: var(--s-2); }
+.fmt-switch { margin: var(--s-3) 0; }
+.imp-list { margin: var(--s-1) 0 var(--s-3); padding-left: var(--s-4); font-size: var(--fs-sm); }
