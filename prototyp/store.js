@@ -49,6 +49,7 @@ var Store = (function () {
       if (!db.rates.m2) { db.rates.m2 = clone(DEFAULTS.rates.m2); db.rates.treadSurcharge = db.rates.treadSurcharge || clone(DEFAULTS.rates.treadSurcharge); save(); }
       // volitelné příplatky (demontáž, vyrovnání) a příplatek za podstupnici byly zrušeny – vyčistí se i z uložených dat
       if ((db.rates.extras || []).length || db.rates.extrasEnabled || db.rates.riserSurcharge !== undefined) { db.rates.extras = []; db.rates.extrasEnabled = false; delete db.rates.riserSurcharge; save(); }
+      if (db.rates.allowance && (db.rates.allowance.depth || db.rates.allowance.riser)) { db.rates.allowance.depth = 0; db.rates.allowance.riser = 0; save(); }
       // ukázka točitého schodiště přibyla později – doplní se i do už uložených dat (jednou)
       if (!db.demoWinder) { db.demoWinder = 1; if (!calcById('c6')) db.calculations.push(seedCalc(DEFAULTS.calculations.filter(function (c) { return c.id === 'c6'; })[0])); save(); }
       return db; } } } catch (e) { /* poškozená data */ }

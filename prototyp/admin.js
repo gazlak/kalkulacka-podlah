@@ -77,6 +77,7 @@
     photos = {};
     var kols = kolekce(); if (kols.indexOf(adminKol) < 0) adminKol = kols[0];
     var list = Store.db.patterns.filter(function (p) { return p.kolekce === adminKol; }), pi = priceInfo();
+    var pctMode = Store.db.rates.wasteMode === 'pct'; // prořez % u vzoru platí jen v paušálním režimu, jinak se počítá z lamel
     var off = Store.db.patterns.filter(function (p) { return p.active !== false; }), noPrice = off.filter(function (p) { return !(Calc.patternPrice(pi, p, null) > 0); }).length;
     A.render(tabs('patterns') + '<div class="alert info">' + Store.db.patterns.length + ' vzorů v ' + kols.length + ' kolekcích, nabízí se ' + off.length + (noPrice ? ', z toho ' + noPrice + ' bez ceny' : '') + '. Cena dekoru se bere z kolekce (záložka Kolekce), tady ji lze jen přepsat. Změna cen se projeví jen v nových kalkulacích – uložené kalkulace drží své ceny (snapshot).</div>' + A.question('photos') +
       '<div class="field"><label for="akol">Kolekce</label><select id="akol" data-change="adminKol">' + kols.map(function (k) {
@@ -84,26 +85,27 @@
         return '<option value="' + esc(k) + '"' + (k === adminKol ? ' selected' : '') + '>' + esc(k) + ' (' + n + ')</option>';
       }).join('') + '</select></div>' +
       '<form class="card" data-submit="saveKolekce" novalidate><h2 class="card-title">Nastavení pro celou kolekci</h2><p class="small muted">Vyplněná pole se zapíšou všem ' + list.length + ' vzorům kolekce, prázdná zůstanou beze změny.</p>' +
-      '<div class="group-grid" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr))">' + field('priceOverride', 'Vlastní cena (Kč/m²)', '') + field('wastePct', 'Prořez (%)', '') + '</div>' +
+      '<div class="group-grid" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr))">' + field('priceOverride', 'Vlastní cena (Kč/m²)', '') + (pctMode ? field('wastePct', 'Prořez (%)', '') : '') + '</div>' +
       '<div class="field"><label>Dostupnost</label><select name="active"><option value="">beze změny</option><option value="1">aktivní (nabízet)</option><option value="0">skrýt</option></select></div>' +
       check('clearOverride', 'Zrušit vlastní ceny (podle kolekce)', false) +
       '<button class="btn primary block mt" type="submit">Nastavit celé kolekci</button></form>' +
-      list.map(function (p) {
+      '<div class="pat-admin-grid">' + list.map(function (p) {
         var c = Calc.collectionOf(pi, p, null), lbl = c ? 'Vlastní cena (prázdné = podle kolekce ' + esc(c.name) + ': ' + kcs(c.materialPerM2) + ')' : 'Vlastní cena (dekor nemá kolekci)';
         return '<form class="card pat-admin" data-submit="savePattern" data-id="' + p.id + '" novalidate><img class="cover" loading="lazy" id="pimg' + p.id + '" src="' + A.patternImg(p) + '" alt="">' +
           '<div class="pbody"><div class="photo-actions"><label class="btn sm tonal">' + ic('plus') + 'Nahrát fotku<input type="file" class="sr" accept="image/*" data-change="patFile" data-id="' + p.id + '" aria-label="Fotka vzoru ' + p.id + '"></label>' +
           '<button type="button" class="btn sm ghost" data-click="patTex" data-id="' + p.id + '">Výchozí textura</button></div>' +
           '<div class="field"><label for="pn' + p.id + '">Název vzoru</label><input type="text" id="pn' + p.id + '" name="name" value="' + esc(p.name) + '"><div class="err"></div></div>' +
           '<div class="group-grid" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr))">' +
-          field('priceOverride', lbl, p.priceOverride) + field('wastePct', 'Prořez (%)', p.wastePct) + '</div>' +
+          field('priceOverride', lbl, p.priceOverride) + (pctMode ? field('wastePct', 'Prořez (%)', p.wastePct) : '') + '</div>' +
           check('active', 'Nabízet v kalkulaci' + (p.variant ? ' (' + (p.variant === 'click' ? 'CLICK' : 'LEPENÁ') + ')' : ''), p.active !== false) +
           '<button class="btn primary block mt" type="submit">Uložit vzor</button></div></form>';
-      }).join(''), { wide: true, title: 'Správa' });
+      }).join('') + '</div>', { wide: true, title: 'Správa' });
   });
   A.on('change', 'adminKol', function (el) { adminKol = el.value; A.dispatch(); });
   A.on('submit', 'saveKolekce', function (form) {
     var e = form.elements, ok = true, set = {};
     [['priceOverride', 1e6], ['wastePct', 100]].forEach(function (k) {
+      if (!e[k[0]]) return;
       var raw = e[k[0]].value.trim(), v = num(e[k[0]]), bad = raw !== '' && !(v >= 0 && v <= k[1]);
       A.setErr(e[k[0]], bad ? 'Zadejte číslo 0–' + k[1] : ''); if (bad) ok = false; else if (raw !== '') set[k[0]] = v;
     });
@@ -133,10 +135,10 @@
     var raw = e.priceOverride.value.trim();
     chk(e.name, !e.name.value.trim(), 'Zadejte název');
     chk(e.priceOverride, raw !== '' && !(num(e.priceOverride) >= 0), 'Zadejte cenu ≥ 0 nebo nechte prázdné');
-    chk(e.wastePct, !(num(e.wastePct) >= 0 && num(e.wastePct) <= 100), 'Prořez musí být 0–100 %');
+    if (e.wastePct) chk(e.wastePct, !(num(e.wastePct) >= 0 && num(e.wastePct) <= 100), 'Prořez musí být 0–100 %');
     if (!ok) return;
     p.priceOverride = raw === '' ? null : num(e.priceOverride); p.priceEst = false;
-    p.name = e.name.value.trim(); p.wastePct = num(e.wastePct); p.active = e.active.checked;
+    p.name = e.name.value.trim(); if (e.wastePct) p.wastePct = num(e.wastePct); p.active = e.active.checked;
     if (p.id in photos || String(p.id) in photos) p.photo = photos[p.id];
     if (!Store.save()) return A.toast('Uložení se nepodařilo (plné úložiště?) – zkuste menší fotku');
     A.toast('Vzor uložen');
@@ -275,7 +277,7 @@
       field('riserHours', 'Podstupnice (h na kus)', lab.riserHours) + A.question('laborHours') + '</div>' +
       '<div class="section-title">Lišty a hrany</div><div class="card"><div class="group-grid">' + field('trimPerBm', 'Lišta KPV50 (Kč/bm)', r.trimPerBm, 'Na stranu schodiště u zdi.') + field('edgePerBm', 'Vinylová hrana (Kč/bm)', r.edgePerBm, 'Na otevřenou stranu (bez zdi). Prázdné = nezadáno.') + '</div>' +
       '<p class="small muted" style="margin:0">Délka se počítá z naměřených rozměrů pro každou stranu schodiště zvlášť: (hloubka nášlapu + výška podstupnice) × počet schodů. Strana u zdi jde do lišty, otevřená strana do hrany; u šikmých schodů se bere hloubka té strany. Kterou stranu má schodiště u zdi, se volí v kalkulaci (Strany schodiště).</p>' + A.question('edgePrice') + '</div>' +
-      '<div class="section-title">Přídavky na ořez</div><div class="card"><div class="group-grid">' + field('alW', 'Šířka (cm)', al.width) + field('alD', 'Hloubka (cm)', al.depth) + field('alR', 'Podstupnice (cm)', al.riser) + '</div>' + A.question('allowanceAll') + '</div>' +
+      '<div class="section-title">Přídavek na ořez</div><div class="card">' + field('alW', 'Šířka – vlevo a vpravo celkem (cm)', al.width, 'Přičte se k naměřené šířce schodu, např. 100 cm → 103 cm. Hloubka a podstupnice se počítají bez přídavku.') + '</div>' +
       '<div class="section-title">Nos schodu</div><div class="card"><p class="small muted">Přesah přes hranu a ohyb pro nos, zvlášť pro MDF a vinyl (mm).</p><div class="group-grid">' +
       field('nsMo', 'MDF přesah', ns.mdfOverhangMm) + field('nsMw', 'MDF ohyb', ns.mdfWrapMm) + field('nsVo', 'Vinyl přesah', ns.vinylOverhangMm) + field('nsVw', 'Vinyl ohyb', ns.vinylWrapMm) + '</div>' + A.question('noseAllowance') + '</div>' +
       '<div class="section-title">Prořez</div><div class="card">' + sel('wasteMode', 'Režim prořezu', [['lamellas', 'Podle lamel (skutečná spotřeba)'], ['pct', 'Paušál v % u dekoru']], r.wasteMode, 'Paušál se nastavuje u vzoru. U kolekce bez rozměru lamely se použije vždy paušál.') + A.question('lamellaJoint') + '</div>' +
@@ -287,7 +289,7 @@
   function nf2(x) { return new Intl.NumberFormat('cs-CZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(x); }
   A.on('submit', 'saveRates', function (form) {
     var e = form.elements, r = Store.db.rates, ok = true;
-    var req = ['transport', 'mdfThickness', 'mdfEur', 'eurRate', 'glueKg', 'glueG', 'reservePct', 'riserHours', 'trimPerBm', 'alW', 'alD', 'alR', 'nsMo', 'nsMw', 'nsVo', 'nsVw']
+    var req = ['transport', 'mdfThickness', 'mdfEur', 'eurRate', 'glueKg', 'glueG', 'reservePct', 'riserHours', 'trimPerBm', 'alW', 'nsMo', 'nsMw', 'nsVo', 'nsVw']
       .concat(r.extras.map(function (x) { return 'x_' + x.key; }));
     Calc.TREAD_TYPES.forEach(function (t) { req.push('t_' + t.id, 'h_' + t.id); });
     req.forEach(function (k) { var bad = !(num(e[k]) >= 0); A.setErr(e[k], bad ? 'Zadejte číslo ≥ 0' : ''); if (bad) ok = false; });
@@ -303,7 +305,7 @@
     r.treadSurcharge = {};
     Calc.TREAD_TYPES.forEach(function (t) { r.labor.hoursByTread[t.id] = num(e['h_' + t.id]); r.treadSurcharge[t.id] = num(e['t_' + t.id]); });
     r.trimPerBm = num(e.trimPerBm); r.edgePerBm = optNum(e.edgePerBm);
-    r.allowance = { width: num(e.alW), depth: num(e.alD), riser: num(e.alR) };
+    r.allowance = { width: num(e.alW), depth: 0, riser: 0 };
     r.nose = { mdfOverhangMm: num(e.nsMo), mdfWrapMm: num(e.nsMw), vinylOverhangMm: num(e.nsVo), vinylWrapMm: num(e.nsVw) };
     r.wasteMode = e.wasteMode.value;
 

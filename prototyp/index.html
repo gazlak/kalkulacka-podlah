@@ -8,7 +8,7 @@
   <script>/* výchozí je světlý režim; podle systému jen když si to uživatel zvolí (Auto) */
     var t = null; try { t = localStorage.getItem('kp_theme'); } catch (e) { /* ignore */ }
     if (t !== 'auto') document.documentElement.dataset.theme = t === 'dark' ? 'dark' : 'light';</script>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=1792060307">
 </head>
 <body>
   <!-- sprite ikon (Lucide styl, stroke 2) -->
@@ -56,14 +56,14 @@
   <dialog id="modal"></dialog>
   <div id="toast" role="status" aria-live="polite"></div>
 
-  <script src="patterns.js"></script>
-  <script src="data.js"></script>
-  <script src="calc.js"></script>
-  <script src="plan.js"></script>
-  <script src="store.js"></script>
-  <script src="app.js"></script>
-  <script src="wizard.js"></script>
-  <script src="admin.js"></script>
+  <script src="patterns.js?v=1792060307"></script>
+  <script src="data.js?v=1792060307"></script>
+  <script src="calc.js?v=1792060307"></script>
+  <script src="plan.js?v=1792060307"></script>
+  <script src="store.js?v=1792060307"></script>
+  <script src="app.js?v=1792060307"></script>
+  <script src="wizard.js?v=1792060307"></script>
+  <script src="admin.js?v=1792060307"></script>
   <script>App.start();</script>
 </body>
 </html>

@@ -40,7 +40,6 @@ var App = (function () {
     { k: 'photos', t: 'Fotky vzorů', x: 'Ukázkové fotky jsou nahrazeny texturami. Správce nahraje skutečné fotky v administraci. Stačí jedna fotka na vzor?' },
     { k: 'labor', t: 'Práce: normohodiny', x: 'Nahrazeno normohodinami: práce = počet nášlapů × hodiny podle typu nášlapu × hodinová sazba, podstupnice zvlášť. Souhlasí takový model, nebo se má účtovat za m² / za kus?' },
     { k: 'noseAllowance', t: 'Přídavek na nos', x: 'Kolik mm přesahu a ohybu (zalomení přes hranu) se pro nos počítá u MDF a u vinylu zvlášť? Zatím 0 mm – je to v Sazbách, sekce Nos.' },
-    { k: 'allowanceAll', t: 'Přídavky na ořez', x: 'Přídavek 3 cm na šířku, hloubku i podstupnici – platí pro všechny schody stejně, nebo se liší podle typu (podesta, šikmý schod)?' },
     { k: 'glueLayers', t: 'Lepidlo: 1× nebo 2× nános', x: 'Lepí se jen vinyl na MDF (1×), nebo i MDF na podklad (2×)? Řeší přepínač v Sazbách.' },
     { k: 'variants', t: 'Nabízené varianty', x: 'Má se nabízet LEPENÁ i CLICK varianta u všech kolekcí? V Kolekcích jde zapnout/vypnout každou zvlášť.' },
     { k: 'mocPrice', t: 'MOC a cena pro podlaháře', x: 'Ceny v tabulce jsou doporučené (MOC) bez DPH. Počítá podlahář s MOC, nebo s vlastní nákupní cenou / slevou z ceníku?' },

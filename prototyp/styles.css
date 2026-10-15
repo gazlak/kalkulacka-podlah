@@ -426,10 +426,12 @@ table.tbl tr.best td { background: var(--ok-soft); }
 .user-row .lead > div { min-width: 0; }
 .user-row .lead b { display: block; overflow: hidden; text-overflow: ellipsis; }
 .user-row .sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pat-admin { overflow: hidden; padding: 0; }
-.pat-admin img.cover { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; }
-.pat-admin .pbody { padding: var(--s-4); }
-.pat-admin .photo-actions { display: flex; flex-wrap: wrap; gap: var(--s-2); align-items: center; margin-bottom: var(--s-4); }
+.pat-admin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--s-3); }
+.pat-admin { overflow: hidden; padding: 0; margin: 0; }
+.pat-admin img.cover { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; }
+.pat-admin .pbody { padding: var(--s-3); }
+.pat-admin .pbody .group-grid { grid-template-columns: 1fr 1fr !important; }
+.pat-admin .photo-actions { display: flex; flex-wrap: wrap; gap: var(--s-2); align-items: center; margin-bottom: var(--s-3); }
 .logo-prev { max-height: 64px; max-width: 200px; border: 1px dashed var(--line-strong); padding: var(--s-2); border-radius: var(--r-md); background: #fff; }
 .logo-box { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
 

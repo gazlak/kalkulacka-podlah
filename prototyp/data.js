@@ -48,7 +48,7 @@ var DEFAULTS = {
     reserve: { pct: 5, onVinyl: false },
     labor: { hourly: null, hoursByTread: { nose: 1, flat: 1, landingNose: 1, landingFlat: 1 }, riserHours: 1 },
     trimPerBm: 99, edgePerBm: null,
-    allowance: { width: 3, depth: 3, riser: 3 },
+    allowance: { width: 3, depth: 0, riser: 0 },  // přídavek na ořez jen na šířku (vlevo + vpravo celkem)
     nose: { mdfOverhangMm: 0, mdfWrapMm: 0, vinylOverhangMm: 0, vinylWrapMm: 0 },
     wasteMode: 'lamellas',
     variants: { glued: true, click: true },
