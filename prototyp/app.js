@@ -25,7 +25,9 @@ var App = (function () {
     return Calc.computeQuote(c.groups, c.patternId, A.pricingOf(c), c.discount, c.vatRate, c.extras, A.quoteOpt(c));
   };
   A.icon = function (n, cls) { return '<svg class="ic' + (cls ? ' ' + cls : '') + '" aria-hidden="true"><use href="#i-' + n + '"/></svg>'; };
-  A.statusLabel = function (s) { return s[0].toUpperCase() + s.slice(1); };
+  A.isAdmin = function (u) { return !!u && u.role === 'admin'; };
+  var STATUS_LABELS = { 'předáno': 'Ke zpracování' };
+  A.statusLabel = function (s) { return STATUS_LABELS[s] || s[0].toUpperCase() + s.slice(1); };
   A.initials = function (u) {
     var n = (u.profile && u.profile.name) || u.email || '?';
     return n.split(/\s+/).filter(Boolean).slice(0, 2).map(function (p) { return p[0].toUpperCase(); }).join('');
@@ -36,17 +38,17 @@ var App = (function () {
     { k: 'firms', t: 'Více firem?', x: 'Používá aplikaci jeden podlahář, nebo více firem, každá s vlastním ceníkem? Teď je ceník společný a spravuje ho admin.' },
     { k: 'numbering', t: 'Číselná řada kalkulací', x: 'Je číslování RRRR-NNNN společné pro všechny, nebo má každý podlahář svou vlastní řadu? Teď je společná.' },
     { k: 'custContact', t: 'E-mail a telefon zákazníka', x: 'Krok Zakázka (3.) podle zadání neobsahuje e-mail ani telefon zákazníka, ale „Odeslat e-mailem“ e-mail potřebuje. Zatím se zadává až v okně odeslání. Přidat pole sem?' },
-    { k: 'spiral', t: 'Točité / lichoběžníkové schody a podesty', x: 'Zadání počítá jen s obdélníkovými nášlapy. Jak řešit točité schody, zkosené nášlapy a podesty?' },
+    { k: 'spiral', t: 'Točité / lichoběžníkové schody', x: 'Zadání počítá jen s obdélníkovými nášlapy. Jak řešit točité schody a zkosené nášlapy?' },
     { k: 'photos', t: 'Fotky vzorů', x: 'Ukázkové fotky jsou nahrazeny texturami. Správce nahraje skutečné fotky v administraci. Stačí jedna fotka na vzor?' },
     { k: 'labor', t: 'Práce: normohodiny', x: 'Nahrazeno normohodinami: práce = počet nášlapů × hodiny podle typu nášlapu × hodinová sazba, podstupnice zvlášť. Souhlasí takový model, nebo se má účtovat za m² / za kus?' },
-    { k: 'noseAllowance', t: 'Přídavek na nos', x: 'Kolik mm přesahu a ohybu (zalomení přes hranu) se pro nos počítá u MDF a u vinylu zvlášť? Zatím 0 mm – je to v Sazbách, sekce Nos.' },
+    { k: 'stepKindPrice', t: 'Typ schodu a cena', x: 'Má typ schodu Rovný / Šikmý · rohový nějaký vliv na cenu (příplatek, normohodiny, rezerva)? Zatím je jen informativní.' },
     { k: 'glueLayers', t: 'Lepidlo: 1× nebo 2× nános', x: 'Lepí se jen vinyl na MDF (1×), nebo i MDF na podklad (2×)? Řeší přepínač v Sazbách.' },
     { k: 'variants', t: 'Nabízené varianty', x: 'Má se nabízet LEPENÁ i CLICK varianta u všech kolekcí? V Kolekcích jde zapnout/vypnout každou zvlášť.' },
     { k: 'mocPrice', t: 'MOC a cena pro podlaháře', x: 'Ceny v tabulce jsou doporučené (MOC) bez DPH. Počítá podlahář s MOC, nebo s vlastní nákupní cenou / slevou z ceníku?' },
     { k: 'eurRate', t: 'Kurz EUR/CZK', x: 'Který kurz (ČNB, vlastní, pevný) a jak často se mění? Prototyp ukládá datum poslední změny hodnoty.' },
     { k: 'lamellaJoint', t: 'Spoj lamel', x: 'Když je schod širší než lamela, musí se lamely nastavovat. Je to přípustné, nebo se má nabídnout jen kolekce s delší lamelou? Odřezky se zatím počítají do nastavení.' },
-    { k: 'laborHours', t: 'Normohodiny', x: 'Kolik hodin trvá obložení jednoho nášlapu (s nosem, bez nosu, podesta) a jedné podstupnice? Zatím 1 h pro všechno.' },
-    { k: 'hourlyRate', t: 'Hodinová sazba', x: 'Jaká je hodinová sazba práce? Dokud není zadaná, kalkulace ukazuje upozornění „Cena není kompletní“.' },
+    { k: 'laborHours', t: 'Normohodiny', x: 'Kolik hodin trvá obložení jednoho nášlapu (s nosem, bez nosu) a jedné podstupnice? Zatím 1 h pro všechno.' },
+    { k: 'hourlyRate', t: 'Hodinová sazba', x: 'Hodinová sazba je zatím 400 Kč/h – potvrdit? Pokud by sazba nebyla zadaná, kalkulace ukazuje upozornění „Cena není kompletní“.' },
     { k: 'edgePrice', t: 'Cena vinylové hrany', x: 'Kolik stojí vinylová hrana za bm? Cena zatím chybí.' },
     { k: 'trimRoute', t: 'Vedení lišty a hrany', x: 'Lišta se vede u strany přiléhající ke zdi, hrana na otevřené straně. Odpovídá to praxi? Počítá se z naměřených rozměrů (hloubka strany + podstupnice).' },
     { k: 'discountTrims', t: 'Sleva i na lišty?', x: 'Sleva se teď počítá z celé ceny včetně lišt, hran a dopravy. Má se vztahovat jen na materiál a práci?' },
@@ -361,7 +363,7 @@ var App = (function () {
   var HF = { q: '', sort: 'date-desc', status: '' };
   var SORTS = [['date-desc', 'Datum – nejnovější'], ['date-asc', 'Datum – nejstarší'], ['price-desc', 'Cena – nejvyšší'], ['price-asc', 'Cena – nejnižší'], ['name-asc', 'Zakázka A–Z'], ['name-desc', 'Zakázka Z–A']];
   A.route('/history', 'user', function (p, user) {
-    var chips = [['', 'Vše'], ['koncept', 'Koncept'], ['odesláno', 'Odesláno'], ['přijato', 'Přijato'], ['zamítnuto', 'Zamítnuto']].map(function (s) {
+    var chips = [['', 'Vše'], ['koncept', 'Koncept'], ['předáno', 'Ke zpracování'], ['odesláno', 'Odesláno'], ['přijato', 'Přijato'], ['zamítnuto', 'Zamítnuto']].map(function (s) {
       return '<button type="button" class="chip' + (HF.status === s[0] ? ' on' : '') + '" data-click="hstat" data-s="' + s[0] + '">' + s[1] + '</button>';
     }).join('');
     A.render('<h1 class="large-title">' + (user.role === 'admin' ? 'Všechny kalkulace' : 'Kalkulace') + '</h1>' +
@@ -397,8 +399,9 @@ var App = (function () {
       return r * dir;
     });
     var html = items.map(function (x) {
-      var c = x.c, href = c.number || c.ownerId !== user.id ? '#/calc/' + c.id : '#/wizard/' + c.id + '/1';
-      var edit = c.ownerId === user.id ? '<a class="hist-edit" href="#/wizard/' + c.id + '/1">' + A.icon('edit', 'sm') + 'Upravit</a>' : '';
+      var c = x.c, canEdit = A.isAdmin(user) || (c.ownerId === user.id && c.status === 'koncept');
+      var adm = A.isAdmin(user), href = c.number || !canEdit || adm ? '#/calc/' + c.id : '#/wizard/' + c.id + '/1';
+      var edit = canEdit && !adm ? '<a class="hist-edit" href="#/wizard/' + c.id + '/1">' + A.icon('edit', 'sm') + 'Upravit</a>' : '';
       return '<div class="hist-card"><div class="top"><div><a class="name hist-link" href="' + href + '">' + esc(c.job.name || 'Bez názvu') + '</a>' +
         '<div class="small muted">' + esc(c.job.customer || 'bez zákazníka') + ' · ' + A.fmtDate(c.updatedAt) + '</div></div>' +
         '<div class="price">' + (x.total === null ? '—' : fmt(x.total)) + '</div></div>' +

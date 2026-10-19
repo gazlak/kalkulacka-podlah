@@ -9,6 +9,8 @@
     }).join('') + '</div>';
   }
   function num(el) { return Calc.num(el.value); }
+  // krátká poznámka „jak se to počítá“ pod kartou; vzorec dávat do <b>. Při změně vzorce v calc.js ji aktualizovat.
+  function how(html) { return '<div class="calc-how">' + ic('help', 'sm') + '<span>' + html + '</span></div>'; }
 
   /* ---------- uživatelé ---------- */
   A.route('/admin/users', 'admin', function (p, me) {
@@ -79,7 +81,7 @@
     var list = Store.db.patterns.filter(function (p) { return p.kolekce === adminKol; }), pi = priceInfo();
     var pctMode = Store.db.rates.wasteMode === 'pct'; // prořez % u vzoru platí jen v paušálním režimu, jinak se počítá z lamel
     var off = Store.db.patterns.filter(function (p) { return p.active !== false; }), noPrice = off.filter(function (p) { return !(Calc.patternPrice(pi, p, null) > 0); }).length;
-    A.render(tabs('patterns') + '<div class="alert info">' + Store.db.patterns.length + ' vzorů v ' + kols.length + ' kolekcích, nabízí se ' + off.length + (noPrice ? ', z toho ' + noPrice + ' bez ceny' : '') + '. Cena dekoru se bere z kolekce (záložka Kolekce), tady ji lze jen přepsat. Změna cen se projeví jen v nových kalkulacích – uložené kalkulace drží své ceny (snapshot).</div>' + A.question('photos') +
+    A.render(tabs('patterns') + '<div class="alert info">' + Store.db.patterns.length + ' vzorů v ' + kols.length + ' kolekcích, nabízí se ' + off.length + (noPrice ? ', z toho ' + noPrice + ' bez ceny' : '') + '. Cena dekoru se bere z kolekce (záložka Kolekce), tady ji lze jen přepsat. Změna cen se projeví jen v nových kalkulacích – uložené kalkulace drží své ceny (snapshot).</div>' + A.question('photos') + how('<b>Vlastní cena</b> přepíše cenu kolekce jen pro tento dekor. <b>Prořez %</b> platí jen v paušálním režimu.') +
       '<div class="field"><label for="akol">Kolekce</label><select id="akol" data-change="adminKol">' + kols.map(function (k) {
         var n = Store.db.patterns.filter(function (p) { return p.kolekce === k; }).length;
         return '<option value="' + esc(k) + '"' + (k === adminKol ? ' selected' : '') + '>' + esc(k) + ' (' + n + ')</option>';
@@ -149,6 +151,7 @@
   A.route('/admin/collections', 'admin', function () {
     var cs = Store.db.collections, v = Store.db.rates.variants || { glued: true, click: true };
     A.render(tabs('collections') + '<div class="alert info">Ceny jsou doporučené (MOC) <b>bez DPH</b>. Dekory dědí cenu z kolekce; uložené kalkulace drží své ceny.' + A.question('mocPrice') + '</div>' +
+      how('<b>Vinyl = spotřeba (m²) × cena kolekce.</b> Délka a šířka lamely určují spotřebu v režimu Podle lamel. Bez rozměru se počítá paušál.') + +
       '<form data-submit="saveCollections" novalidate><div class="section-title">Nabízené varianty</div><div class="card">' +
       check('var_glued', 'LEPENÁ', v.glued !== false) + check('var_click', 'CLICK', v.click !== false) + A.question('variants') + '</div>' +
       '<div class="section-title">Kolekce (' + cs.length + ')</div>' + cs.map(function (c) {
@@ -254,42 +257,48 @@
     return m;
   }
   A.route('/admin/rates', 'admin', function () {
-    var r = Store.db.rates, mdf = r.mdf, eur = r.eur, gl = r.glue, rs = r.reserve, lab = r.labor, al = r.allowance, ns = r.nose, miss = missingRates(r);
+    var r = Store.db.rates, mdf = r.mdf, eur = r.eur, gl = r.glue, rs = r.reserve, lab = r.labor, ct = r.cut || {}, cv = ct.vinyl || {}, cm = ct.mdf || {}, miss = missingRates(r);
     function sel(name, label, opts, cur, hint) {
       return '<div class="field"><label>' + label + '</label><select name="' + name + '">' + opts.map(function (o) { return '<option value="' + o[0] + '"' + (String(o[0]) === String(cur) ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select>' + (hint ? '<div class="hint">' + hint + '</div>' : '') + '</div>';
     }
     var mdfM2 = mdf.thicknessMm / 1000 * mdf.eurPerM3 * eur.rate, glueM2 = gl.czkPerKg * gl.gPerM2 / 1000;
+    var tt = Calc.TREAD_TYPES[0], tth = (lab.hoursByTread || {})[tt.id], hr = lab.hourly;
+    var workEx = tth > 0 && hr > 0 ? ' Např. nášlap ' + tt.label.toLowerCase() + ': <b>' + nf2(tth).replace(/,00$/, '') + ' h × ' + nf2(hr).replace(/,00$/, '') + ' = ' + kcs(tth * hr) + '</b>.' : '';
     A.render(tabs('rates') + (miss.length ? '<div class="alert warn"><b>Cena není kompletní:</b> chybí ' + miss.join(', ') + '. Kalkulace tuto položku nezapočítá a ukáže upozornění.</div>' : '') +
+      '<div class="card"><b>Cena</b> = vinyl + MDF + lepidlo + práce + podstupnice + lišta + hrana + doprava (+ příplatek) − sleva, pak DPH. Každá položka se zaokrouhlí podle nastavení. Uložené kalkulace drží svůj ceník.</div>' +
       '<form data-submit="saveRates" novalidate><div class="section-title">Obecné</div><div class="card">' +
       field('transport', 'Doprava (Kč, paušál)', r.transport) +
       '<div class="field"><label for="vd">Výchozí DPH</label><select id="vd" name="vatDefault">' + r.vatOptions.map(function (v) { return '<option value="' + v + '"' + (v === r.vatDefault ? ' selected' : '') + '>' + Math.round(v * 100) + ' %</option>'; }).join('') + '</select><div class="hint">Na kalkulaci lze přepnout 21 % / 12 %.</div></div>' +
-      '<div class="field" style="margin:0"><label for="rt">Zaokrouhlení</label><select id="rt" name="roundTo"><option value="1"' + (r.roundTo === 1 ? ' selected' : '') + '>na celé Kč</option><option value="10"' + (r.roundTo === 10 ? ' selected' : '') + '>na 10 Kč (ukázka)</option></select></div></div>' +
-      '<div class="section-title">MDF a kurz</div><div class="card"><div class="group-grid">' + field('mdfThickness', 'Tloušťka MDF (mm)', mdf.thicknessMm) + field('mdfEur', 'MDF (EUR/m³ bez DPH)', mdf.eurPerM3) + '</div>' +
+      '<div class="field" style="margin:0"><label for="rt">Zaokrouhlení</label><select id="rt" name="roundTo"><option value="1"' + (r.roundTo === 1 ? ' selected' : '') + '>na celé Kč</option><option value="10"' + (r.roundTo === 10 ? ' selected' : '') + '>na 10 Kč (ukázka)</option></select></div>' + how('Doprava se připočte jednou za kalkulaci. Sleva se odečte před DPH.') + '</div>' +
+      '<div class="section-title">MDF a kurz</div><div class="card"><div class="group-grid">' + field('mdfThickness', 'Tloušťka MDF (mm)', mdf.thicknessMm) + field('mdfEur', 'Cena MDF (EUR/m³)', mdf.eurPerM3, 'Bez DPH.') + '</div>' +
       field('eurRate', 'Kurz (Kč/EUR)', eur.rate, 'Naposledy změněno ' + A.fmtDate(eur.changedAt) + '. Datum se nastaví, když hodnotu změníte.') + A.question('eurRate') +
-      '<p class="small muted" style="margin:0">MDF vychází na <b>' + nf2(mdfM2) + ' Kč/m²</b>.</p></div>' +
+      how('MDF Kč/m² = tloušťka (m) × EUR/m³ × kurz = <b>' + nf2(mdfM2) + ' Kč/m²</b>. Plocha MDF = (hloubka + rezerva MDF) × délka + 2 podstupnice, × (1 + rezerva na vstupy).') + '</div>' +
       '<div class="section-title">Lepidlo a rezerva</div><div class="card"><div class="group-grid">' + field('glueKg', 'Lepidlo (Kč/kg)', gl.czkPerKg) + field('glueG', 'Nános (g/m²)', gl.gPerM2) + '</div>' +
-      '<p class="small muted">Lepidlo vychází na <b>' + nf2(glueM2) + ' Kč/m²</b> jednoho nánosu.</p>' +
+      how('Lepidlo Kč/m² = Kč/kg × g/m² / 1000 = <b>' + nf2(glueM2) + ' Kč/m²</b> jednoho nánosu. Plocha = plocha vinylu (2× nános: + plocha MDF) × (1 + rezerva).') +
       sel('glueLayers', 'Počet nánosů', [[1, '1× – vinyl na MDF'], [2, '2× – i MDF na podklad']], gl.layers) + A.question('glueLayers') +
-      field('reservePct', 'Rezerva na vstupy (%)', rs.pct, 'Platí pro MDF a lepidlo.') + check('reserveOnVinyl', 'Rezervu počítat i na vinyl', rs.onVinyl) + '</div>' +
+      field('reservePct', 'Rezerva na vstupy (%)', rs.pct, 'Platí pro MDF a lepidlo.') + check('reserveOnVinyl', 'Rezervu počítat i na vinyl', rs.onVinyl) + how('Rezerva na vstupy zvedá MDF a lepidlo, zaškrtnutím i vinyl.') + '</div>' +
       '<div class="section-title">Práce</div><div class="card">' + field('hourly', 'Hodinová sazba (Kč/h)', lab.hourly, 'Prázdné = nezadáno (kalkulace ukáže upozornění).') + A.question('hourlyRate') +
       '<div class="lbl">Normohodiny na nášlap</div><div class="group-grid">' +
       Calc.TREAD_TYPES.map(function (t) { return field('h_' + t.id, t.label + ' (h)', (lab.hoursByTread || {})[t.id]); }).join('') + '</div>' +
-      field('riserHours', 'Podstupnice (h na kus)', lab.riserHours) + A.question('laborHours') + '</div>' +
+      field('riserHours', 'Podstupnice (h na kus)', lab.riserHours) + A.question('laborHours') +
+      how('<b>Práce = počet nášlapů × normohodiny podle typu × sazba.</b> Podstupnice = počet × h na kus × sazba.' + workEx) + '</div>' +
       '<div class="section-title">Lišty a hrany</div><div class="card"><div class="group-grid">' + field('trimPerBm', 'Lišta KPV50 (Kč/bm)', r.trimPerBm, 'Na stranu schodiště u zdi.') + field('edgePerBm', 'Vinylová hrana (Kč/bm)', r.edgePerBm, 'Na otevřenou stranu (bez zdi). Prázdné = nezadáno.') + '</div>' +
-      '<p class="small muted" style="margin:0">Délka se počítá z naměřených rozměrů pro každou stranu schodiště zvlášť: (hloubka nášlapu + výška podstupnice) × počet schodů. Strana u zdi jde do lišty, otevřená strana do hrany; u šikmých schodů se bere hloubka té strany. Kterou stranu má schodiště u zdi, se volí v kalkulaci (Strany schodiště).</p>' + A.question('edgePrice') + '</div>' +
-      '<div class="section-title">Přídavek na ořez</div><div class="card">' + field('alW', 'Šířka – vlevo a vpravo celkem (cm)', al.width, 'Přičte se k naměřené šířce schodu, např. 100 cm → 103 cm. Hloubka a podstupnice se počítají bez přídavku.') + '</div>' +
-      '<div class="section-title">Nos schodu</div><div class="card"><p class="small muted">Přesah přes hranu a ohyb pro nos, zvlášť pro MDF a vinyl (mm).</p><div class="group-grid">' +
-      field('nsMo', 'MDF přesah', ns.mdfOverhangMm) + field('nsMw', 'MDF ohyb', ns.mdfWrapMm) + field('nsVo', 'Vinyl přesah', ns.vinylOverhangMm) + field('nsVw', 'Vinyl ohyb', ns.vinylWrapMm) + '</div>' + A.question('noseAllowance') + '</div>' +
-      '<div class="section-title">Prořez</div><div class="card">' + sel('wasteMode', 'Režim prořezu', [['lamellas', 'Podle lamel (skutečná spotřeba)'], ['pct', 'Paušál v % u dekoru']], r.wasteMode, 'Paušál se nastavuje u vzoru. U kolekce bez rozměru lamely se použije vždy paušál.') + A.question('lamellaJoint') + '</div>' +
+      A.question('edgePrice') + how('<b>bm strany = (hloubka + podstupnice) × počet schodů.</b> Strana u zdi → lišta, otevřená → hrana. Strany se volí u skupiny. Na kalkulaci lze bm přepsat.') + '</div>' +
+      '<div class="section-title">Rezerva na ořez</div><div class="card"><div class="lbl">Vinyl</div><div class="group-grid">' + field('cvFlat', 'Bez nosu (mm)', cv.flatMm) + field('cvNose', 'S nosem (mm)', cv.noseMm) + '</div>' +
+      '<div class="lbl">MDF</div><div class="group-grid">' + field('cmFlat', 'Bez nosu (mm)', cm.flatMm) + field('cmNose', 'S nosem (mm)', cm.noseMm) + '</div>' + field('cmRiser', 'Přídavek k výšce podstupnice (mm)', cm.riserMm) +
+      how('<b>Nářez vinylu = délka × (hloubka + rezerva).</b> Podstupnice vinyl = délka × výška. MDF podstupnice = 2 × (výška + přídavek). Podlahář rezervu nevidí.') +
+      field('vinylInfoPct', 'Vinyl – informativní sleva pro admina (%)', r.vinylInfoPct, 'Jen údaj v rozpisu pro správce, cenu nemění.') + '</div>' +
+      '<div class="section-title">Prořez</div><div class="card">' + sel('wasteMode', 'Režim prořezu', [['lamellas', 'Podle lamel (skutečná spotřeba)'], ['pct', 'Paušál v % u dekoru']], r.wasteMode, 'Paušál se nastavuje u vzoru. U kolekce bez rozměru lamely se použije vždy paušál.') + A.question('lamellaJoint') +
+      how(r.wasteMode === 'pct' ? '<b>Spotřeba = plocha k nářezu × (1 + prořez % u vzoru).</b>' : '<b>Spotřeba = celé lamely</b> potřebné na pruhy nášlapu a podstupnice, s odřezky.') + '</div>' +
       '<div class="section-title">Příplatek za typ nášlapu</div><div class="card"><div class="group-grid">' +
-      Calc.TREAD_TYPES.map(function (t) { return field('t_' + t.id, t.label + ' (Kč/nášlap)', (r.treadSurcharge || {})[t.id] || 0); }).join('') + '</div><p class="small muted" style="margin:0">Případný příplatek, zatím 0.</p></div>' +
+      Calc.TREAD_TYPES.map(function (t) { return field('t_' + t.id, t.label + ' (Kč/nášlap)', (r.treadSurcharge || {})[t.id] || 0); }).join('') + '</div>' + how('<b>Počet nášlapů daného typu × příplatek.</b>') + '</div>' +
       '<button class="btn primary block" type="submit">Uložit sazby</button></form>' +
       '<div class="section-title">Demo data</div><div class="card"><p class="small muted">Vrátí ceník, uživatele i kalkulace na původní ukázková data.</p><button class="btn danger block" data-click="resetDemo">' + ic('refresh') + 'Obnovit ukázková data</button></div>', { title: 'Správa' });
   });
   function nf2(x) { return new Intl.NumberFormat('cs-CZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(x); }
   A.on('submit', 'saveRates', function (form) {
     var e = form.elements, r = Store.db.rates, ok = true;
-    var req = ['transport', 'mdfThickness', 'mdfEur', 'eurRate', 'glueKg', 'glueG', 'reservePct', 'riserHours', 'trimPerBm', 'alW', 'nsMo', 'nsMw', 'nsVo', 'nsVw']
+    var req = ['transport', 'mdfThickness', 'mdfEur', 'eurRate', 'glueKg', 'glueG', 'reservePct', 'riserHours', 'trimPerBm', 'cvFlat', 'cvNose', 'cmFlat', 'cmNose', 'cmRiser', 'vinylInfoPct']
       .concat(r.extras.map(function (x) { return 'x_' + x.key; }));
     Calc.TREAD_TYPES.forEach(function (t) { req.push('t_' + t.id, 'h_' + t.id); });
     req.forEach(function (k) { var bad = !(num(e[k]) >= 0); A.setErr(e[k], bad ? 'Zadejte číslo ≥ 0' : ''); if (bad) ok = false; });
@@ -305,8 +314,8 @@
     r.treadSurcharge = {};
     Calc.TREAD_TYPES.forEach(function (t) { r.labor.hoursByTread[t.id] = num(e['h_' + t.id]); r.treadSurcharge[t.id] = num(e['t_' + t.id]); });
     r.trimPerBm = num(e.trimPerBm); r.edgePerBm = optNum(e.edgePerBm);
-    r.allowance = { width: num(e.alW), depth: 0, riser: 0 };
-    r.nose = { mdfOverhangMm: num(e.nsMo), mdfWrapMm: num(e.nsMw), vinylOverhangMm: num(e.nsVo), vinylWrapMm: num(e.nsVw) };
+    r.cut = { vinyl: { flatMm: num(e.cvFlat), noseMm: num(e.cvNose) }, mdf: { flatMm: num(e.cmFlat), noseMm: num(e.cmNose), riserMm: num(e.cmRiser) } };
+    r.vinylInfoPct = num(e.vinylInfoPct);
     r.wasteMode = e.wasteMode.value;
 
     Store.save(); A.toast('Sazby uloženy'); A.dispatch();

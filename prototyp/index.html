@@ -8,7 +8,7 @@
   <script>/* výchozí je světlý režim; podle systému jen když si to uživatel zvolí (Auto) */
     var t = null; try { t = localStorage.getItem('kp_theme'); } catch (e) { /* ignore */ }
     if (t !== 'auto') document.documentElement.dataset.theme = t === 'dark' ? 'dark' : 'light';</script>
-  <link rel="stylesheet" href="styles.css?v=1792060307">
+  <link rel="stylesheet" href="styles.css?v=1792191000">
 </head>
 <body>
   <!-- sprite ikon (Lucide styl, stroke 2) -->
@@ -32,6 +32,7 @@
     <symbol id="i-chev-r" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
     <symbol id="i-chev-d" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
     <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="4"/></symbol>
     <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></symbol>
     <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></symbol>
     <symbol id="i-send" viewBox="0 0 24 24"><path d="m22 2-11 11M22 2l-7 20-4-9-9-4z"/></symbol>
@@ -39,6 +40,7 @@
     <symbol id="i-compare" viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="16" rx="1.5"/><rect x="14" y="4" width="7" height="16" rx="1.5"/></symbol>
     <symbol id="i-status" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></symbol>
     <symbol id="i-stairs" viewBox="0 0 24 24"><path d="M3 20h5v-5h5v-5h5V5h3"/><path d="M3 20h18"/></symbol>
+    <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2"/></symbol>
     <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5"/></symbol>
     <symbol id="i-flask" viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5.5 9.5A2 2 0 0 0 6.2 21h11.6a2 2 0 0 0 1.7-2.5L14 9V3"/></symbol>
     <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5h13l3.5 7v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6z"/></symbol>
@@ -56,14 +58,14 @@
   <dialog id="modal"></dialog>
   <div id="toast" role="status" aria-live="polite"></div>
 
-  <script src="patterns.js?v=1792060307"></script>
-  <script src="data.js?v=1792060307"></script>
-  <script src="calc.js?v=1792060307"></script>
-  <script src="plan.js?v=1792060307"></script>
-  <script src="store.js?v=1792060307"></script>
-  <script src="app.js?v=1792060307"></script>
-  <script src="wizard.js?v=1792060307"></script>
-  <script src="admin.js?v=1792060307"></script>
+  <script src="patterns.js?v=1792191000"></script>
+  <script src="data.js?v=1792191000"></script>
+  <script src="calc.js?v=1792191000"></script>
+  <script src="plan.js?v=1792191000"></script>
+  <script src="store.js?v=1792191000"></script>
+  <script src="app.js?v=1792191000"></script>
+  <script src="wizard.js?v=1792191000"></script>
+  <script src="admin.js?v=1792191000"></script>
   <script>App.start();</script>
 </body>
 </html>

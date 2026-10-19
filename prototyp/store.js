@@ -38,26 +38,44 @@ var Store = (function () {
       p.collectionId = s.collectionId; p.variant = s.variant; p.priceOverride = null; p.active = s.active;
     });
     var r = d.rates, def = DEFAULTS.rates;
-    ['mdf', 'eur', 'glue', 'reserve', 'labor', 'trimPerBm', 'edgePerBm', 'allowance', 'nose', 'wasteMode', 'variants'].forEach(function (k) {
+    ['mdf', 'eur', 'glue', 'reserve', 'labor', 'trimPerBm', 'edgePerBm', 'allowance', 'nose', 'wasteMode', 'variants', 'cut'].forEach(function (k) {
       if (r[k] === undefined) r[k] = clone(def[k]);
     });
+    delete r.cutMargin;
     return true;
   }
 
+  // pojistka pro admina: už předané kalkulace dostanou verzi „původní od podlaháře“ (jednou)
+  function origVersions() {
+    db.verOrig = 1;
+    db.calculations.forEach(function (c) {
+      var o = userById(c.ownerId);
+      if (c.status === 'koncept' || c.versions || !o || o.role === 'admin') return;
+      var d = clone(c); delete d.photos; delete d.versions;
+      c.versions = [{ at: c.updatedAt || Date.now(), by: c.ownerId, kind: 'original', data: d }];
+    });
+  }
   function load() {
     try { var raw = localStorage.getItem(KEY); if (raw) { db = JSON.parse(raw); if (db && db.users) { if (migrate(db)) save();
       if (!db.rates.m2) { db.rates.m2 = clone(DEFAULTS.rates.m2); db.rates.treadSurcharge = db.rates.treadSurcharge || clone(DEFAULTS.rates.treadSurcharge); save(); }
       // volitelné příplatky (demontáž, vyrovnání) a příplatek za podstupnici byly zrušeny – vyčistí se i z uložených dat
       if ((db.rates.extras || []).length || db.rates.extrasEnabled || db.rates.riserSurcharge !== undefined) { db.rates.extras = []; db.rates.extrasEnabled = false; delete db.rates.riserSurcharge; save(); }
+      // nový model rezervy na ořez nahradil cutMargin (platí jen ve starých snapshotech)
+      if (!db.rates.cut) { db.rates.cut = clone(DEFAULTS.rates.cut); delete db.rates.cutMargin; save(); }
+      else if (!db.rates.cut.vinyl) { var oc = db.rates.cut; db.rates.cut = { vinyl: { flatMm: oc.flatMm, noseMm: oc.noseMm }, mdf: { flatMm: oc.flatMm, noseMm: oc.noseMm, riserMm: oc.mdfRiserMm } }; save(); }
+      if (db.rates.vinylInfoPct === undefined) { db.rates.vinylInfoPct = DEFAULTS.rates.vinylInfoPct; save(); }
+      // výchozí hodinová sazba 400 Kč/h se doplní jednou; pozdější vymazání v Sazbách zůstane platné
+      if (!db.hourly400) { db.hourly400 = 1; if (db.rates.labor && db.rates.labor.hourly === null) db.rates.labor.hourly = 400; save(); }
       if (db.rates.allowance && (db.rates.allowance.depth || db.rates.allowance.riser)) { db.rates.allowance.depth = 0; db.rates.allowance.riser = 0; save(); }
       // ukázka točitého schodiště přibyla později – doplní se i do už uložených dat (jednou)
       if (!db.demoWinder) { db.demoWinder = 1; if (!calcById('c6')) db.calculations.push(seedCalc(DEFAULTS.calculations.filter(function (c) { return c.id === 'c6'; })[0])); save(); }
+      if (!db.verOrig) { origVersions(); save(); }
       return db; } } } catch (e) { /* poškozená data */ }
-    db = seed(); save();
+    db = seed(); origVersions(); save();
     return db;
   }
   function save() { try { localStorage.setItem(KEY, JSON.stringify(db)); return true; } catch (e) { return false; } }
-  function reset() { db = seed(); save(); }
+  function reset() { db = seed(); origVersions(); save(); }
 
   /* ----- session ----- */
   function setSession(userId, remember) {
@@ -90,7 +108,7 @@ var Store = (function () {
   function upsertCalc(c) {
     var i = db.calculations.indexOf(calcById(c.id));
     if (i < 0) db.calculations.push(c); else db.calculations[i] = c;
-    save();
+    return save();
   }
   function nextNumber(ts) {
     var y = new Date(ts || Date.now()).getFullYear(), max = 0;
@@ -112,11 +130,11 @@ var Store = (function () {
       id: uid('c'), ownerId: user.id, number: null, createdAt: now, updatedAt: now, status: 'koncept', sentTo: null,
       job: { name: '', customer: '', address: '', note: '' },
       stairType: 'straight', groups: [newGroup()], patternId: null, discount: { type: 'pct', value: 0 }, vatRate: db.rates.vatDefault,
-      extras: {}, stairSide: 'walls', snapshot: null
+      extras: {}, stairSide: 'walls', snapshot: null, photos: []
     };
   }
   // výchozí hodnoty = typické rozměry (zrychlení cíle "do 2 minut")
-  function newGroup() { return { width: 100, depth: 28, riserHeight: 17, count: 1, coverRiser: true, treadType: 'nose' }; }
+  function newGroup() { return { width: 100, depth: 28, riserHeight: 17, count: 1, coverRiser: true, treadType: 'nose', stepKind: 'straight' }; }
 
   /* ----- tokeny (pozvánky, reset hesla) ----- */
   function makeToken(type, userId, ttlMs) {
