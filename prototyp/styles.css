@@ -567,3 +567,17 @@ html { scroll-padding-top: 72px; scroll-padding-bottom: 180px; }
 .calc-note { margin-top: var(--s-2); }
 .fmt-switch { margin: var(--s-3) 0; }
 .imp-list { margin: var(--s-1) 0 var(--s-3); padding-left: var(--s-4); font-size: var(--fs-sm); }
+
+/* vizualizace schodů na fotce (viz.js) */
+.viz-item { margin: 0 0 var(--s-3); }
+.viz-item > img { width: 100%; border-radius: 10px; display: block; }
+.viz-item figcaption { display: flex; gap: var(--s-2); align-items: center; margin-top: var(--s-2); }
+.viz-item figcaption > span { flex: 1; min-width: 0; }
+.viz-orig { width: 64px; height: 64px; object-fit: cover; border-radius: 6px; flex: none; }
+.viz-busy { display: flex; gap: var(--s-2); align-items: center; padding: var(--s-3) 0; color: var(--muted); }
+.viz-busy .spin { width: 18px; height: 18px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: vizspin .8s linear infinite; }
+@keyframes vizspin { to { transform: rotate(360deg); } }
+.btn.disabled { opacity: .45; pointer-events: none; }
+.pdf-sheet .pdf-viz { margin: var(--s-4) 0; break-inside: avoid; }
+.pdf-sheet .pdf-viz h3 { font-size: 1rem; margin-bottom: 6px; }
+.pdf-sheet .pdf-viz img { width: 100%; max-height: 520px; object-fit: contain; border-radius: 6px; }

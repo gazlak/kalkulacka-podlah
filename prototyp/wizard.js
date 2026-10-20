@@ -9,8 +9,8 @@
     if (!c || !Store.canSee(user, c)) { A.toast('Kalkulace nenalezena'); A.go('/history'); return null; }
     return c;
   }
-  // admin smí cizí kalkulace jen číst (prohlížet, PDF, porovnat, duplikovat)
-  function ro(c) { c = c || W.c; var u = Store.currentUser(); return !!c && !!u && c.ownerId !== u.id; }
+  // podlahář smí upravovat jen své kalkulace, admin všechny
+  function ro(c) { c = c || W.c; var u = Store.currentUser(); return !!c && !!u && u.role !== 'admin' && c.ownerId !== u.id; }
   function touch(c) {
     c.updatedAt = Date.now(); Store.upsertCalc(c);
     var el = A.$('#savedInd'); if (el) el.textContent = (c.number ? 'Změny uloženy ' : 'Koncept uložen ') + A.fmtTime(c.updatedAt);
@@ -72,6 +72,7 @@
     var body = s === 1 ? stepStairs(c) : s === 2 ? stepPattern(c) : s === 3 ? stepJob(c) : calcBody(c, true);
     A.render(head + (s > 1 ? stairsSummary(c) : '') + (s < 4 ? priceNotice(c) : '') + body, { title: c.number ? 'Úprava kalkulace' : 'Nová kalkulace', back: '#/history', saved: saved, bar: actionBar(c, s) });
     barUpdate();
+    if (s === 4) Viz.mount(c, ro(c));
     if (W.showErrors) { W.showErrors = false; showStepErrors(c, s); }
   });
   /* kroky 2–4: stručný souhrn zadaných schodů, klepnutím zpět na krok 1 */
@@ -385,6 +386,7 @@
         (inf ? ' · výrobní plocha ' + m2(inf.prod) : '') + '</small>' + (inf && inf.needsJoint ? JOINT : '') + '</span><span class="v">' + m2(q.areas[i]) + '</span></div>';
     }).join('') + lr('Celková plocha (naměřená)', '', m2(q.totalArea), 'tot') + (q.legacy ? '' : lr('Výrobní plocha vinylu', 'vč. přídavků na ořez', m2(q.prodArea)) + lr('Plocha MDF', '', m2(q.mdfArea))) +
       lr('Typ schodiště', '', Calc.stairType(c).label) + '</div>' + viewCard(c) + planCard(c);
+    html += '<div id="vizCard"></div>';
     html += trimCard(c, q);
     // sleva a DPH
     html += '<div class="section-title">Sleva a DPH</div><div class="card"><div class="lbl">Sleva</div><div class="disc-grid"><div class="seg" role="group" aria-label="Typ slevy"><button type="button"' + dis + ' data-click="discType" data-type="pct" class="' + (c.discount.type === 'pct' ? 'on' : '') + '">%</button><button type="button"' + dis + ' data-click="discType" data-type="czk" class="' + (c.discount.type === 'czk' ? 'on' : '') + '">Kč</button></div>' +
@@ -527,6 +529,7 @@
     else bar = '<div class="actionbar stickybar"><div class="inner">' + priceRow() + '<div class="btns">' + backBtn('#/history') + '<button class="btn sq" data-click="moreSheet" aria-label="Další akce">' + ic('more', 'lg') + '</button><button class="btn primary" data-click="saveCalc">Uložit změny</button></div></div></div>';
     A.render(body, { title: 'Kalkulace ' + (c.number || '(koncept)'), back: '#/history', bar: bar });
     barUpdate();
+    Viz.mount(c, ro(c));
   });
 
   /* ---------- odeslání e-mailem ---------- */
@@ -566,7 +569,7 @@
       c.groups.map(function (g, i) { return '<tr><td>' + esc(g.width) + ' cm</td><td>' + esc(Calc.depthLabel(g)) + ' cm</td><td>' + Calc.treadType(g).label.toLowerCase() + '</td><td>' + (g.coverRiser ? esc(g.riserHeight) + ' cm' : 'bez obkladu') + '</td><td class="num">' + esc(g.count) + ' ks</td><td class="num">' + m2(q.areas[i]) + '</td></tr>'; }).join('') +
       '<tr><td colspan="5"><b>Celkem (naměřená plocha)</b></td><td class="num"><b>' + m2(q.totalArea) + '</b></td></tr>' +
       (q.legacy ? '' : '<tr><td colspan="5">Výrobní plocha vinylu (vč. přídavků)</td><td class="num">' + m2(q.prodArea) + '</td></tr><tr><td colspan="5">Plocha MDF</td><td class="num">' + m2(q.mdfArea) + '</td></tr>') + '</tbody></table>' +
-      '<div class="plan view3d">' + viewHtml(c) + '</div><div class="plan">' + planHtml(c) + '</div>' +
+      '<div class="plan view3d">' + viewHtml(c) + '</div><div class="plan">' + planHtml(c) + '</div>' + Viz.pdf(c) +
       '<table class="tbl"><thead><tr><th>Položka</th><th class="num">Množství</th><th class="num">Jedn. cena</th><th class="num">Částka</th></tr></thead><tbody>' +
       q.lines.map(function (l) {
         return '<tr><td>' + esc(l.label) + (l.sub ? '<br><span class="small muted">' + esc(l.sub) + '</span>' : '') + '</td><td class="num">' + nf.format(l.qty) + ' ' + esc(l.unit) + '</td><td class="num">' + (l.unitPrice ? fmtUnit(l.unitPrice) : '') + '</td><td class="num">' + fmt(l.amount) + '</td></tr>';

@@ -3,6 +3,13 @@
 HTML prototyp pro doladění flow, obrazovek a výpočtu se zákazníkem před vývojem ostré verze (Next.js + PostgreSQL).
 Bez backendu a bez buildu: otevřete `index.html` v prohlížeči (funguje přes `file://`). Pro mobil v DevTools nastavte 360 px.
 
+## Vizualizace schodů na fotce (jen s lokálním serverem)
+`python3 prototyp/server.py` → http://localhost:8801. Server servíruje prototyp bez cache a na obrazovce kalkulace
+umí z fotky schodů udělat vizualizaci s vybraným dekorem (Gemini, model `gemini-3.1-flash-image`, ~1 Kč, 10–20 s).
+Klíč: `GEMINI_API_KEY` nebo soubor `~/.config/gemini/api_key`. Nejvýš 2 vizualizace na kalkulaci, obrázky v
+`prototyp/vizualizace/` (mimo git). Testy: `python3 -m unittest prototyp/test_server.py`.
+Přes `file://` karta jen oznámí, že vizualizace potřebuje server. Spec: `docs/superpowers/specs/2026-10-20-vizualizace-schodu-design.md`.
+
 ## Demo účty
 | E-mail | Heslo | Role |
 |---|---|---|
@@ -21,6 +28,7 @@ Na přihlašovací obrazovce stačí klepnout na účet a údaje se vyplní.
 - `store.js` – localStorage, session, číslování `RRRR-NNNN`
 - `app.js` – router + guardy, přihlášení, reset hesla, pozvánka, historie, profil
 - `wizard.js` – průvodce (kroky 1–4), kalkulace, PDF náhled, e-mail, porovnání vzorů
+- `viz.js` – karta „Vizualizace na fotce“ a obrázek v PDF; `server.py` – lokální server a volání Gemini
 - `admin.js` – uživatelé, vzory, kolekce (CSV export/import), sazby, reset dat
 
 (Oproti původnímu plánu je `app.js` rozdělen na tři soubory kvůli čitelnosti.)
