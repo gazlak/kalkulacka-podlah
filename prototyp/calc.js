@@ -22,7 +22,9 @@ var Calc = (function () {
 
   // typ schodiště (celá kalkulace) a typ nášlapu (skupina); starší data typ nemají a berou se jako první volba
   var STAIR_TYPES = [
-    { id: 'straight', label: 'Rovnoramenné' }, { id: 'right', label: 'Pravotočivé' }, { id: 'left', label: 'Levotočivé' }
+    { id: 'straight', label: 'Přímé / rovnoramenné', turn: 0 },
+    { id: 'right90', label: 'Pravotočivé 90° (do L)', turn: -90 }, { id: 'left90', label: 'Levotočivé 90° (do L)', turn: 90 },
+    { id: 'right', label: 'Pravotočivé 180° (do U)', turn: -180 }, { id: 'left', label: 'Levotočivé 180° (do U)', turn: 180 }
   ];
   var TREAD_TYPES = [
     { id: 'nose', label: 'S nosem', nose: true }, { id: 'flat', label: 'Bez nosu' },

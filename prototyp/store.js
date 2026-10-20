@@ -13,7 +13,7 @@ var Store = (function () {
       rates: clone(DEFAULTS.rates),
       users: clone(DEFAULTS.users),
       tokens: {},
-      calculations: [], demoWinder: 1
+      calculations: [], demoWinder: 1, demoStairs: 1
     };
     DEFAULTS.calculations.forEach(function (c) { d.calculations.push(seedCalc(c)); });
     return d;
@@ -52,6 +52,8 @@ var Store = (function () {
       if (db.rates.allowance && (db.rates.allowance.depth || db.rates.allowance.riser)) { db.rates.allowance.depth = 0; db.rates.allowance.riser = 0; save(); }
       // ukázka točitého schodiště přibyla později – doplní se i do už uložených dat (jednou)
       if (!db.demoWinder) { db.demoWinder = 1; if (!calcById('c6')) db.calculations.push(seedCalc(DEFAULTS.calculations.filter(function (c) { return c.id === 'c6'; })[0])); save(); }
+      // ukázky typů schodišť (d1–d7) přibyly později – doplní se jednou
+      if (!db.demoStairs) { db.demoStairs = 1; DEFAULTS.calculations.forEach(function (c) { if (c.demo && !calcById(c.id)) db.calculations.push(seedCalc(c)); }); save(); }
       return db; } } } catch (e) { /* poškozená data */ }
     db = seed(); save();
     return db;

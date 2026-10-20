@@ -397,8 +397,8 @@ var App = (function () {
       return r * dir;
     });
     var html = items.map(function (x) {
-      var c = x.c, href = c.number || c.ownerId !== user.id ? '#/calc/' + c.id : '#/wizard/' + c.id + '/1';
-      var edit = c.ownerId === user.id ? '<a class="hist-edit" href="#/wizard/' + c.id + '/1">' + A.icon('edit', 'sm') + 'Upravit</a>' : '';
+      var c = x.c, mine = c.ownerId === user.id || user.role === 'admin', href = c.number || !mine ? '#/calc/' + c.id : '#/wizard/' + c.id + '/1';
+      var edit = mine ? '<a class="hist-edit" href="#/wizard/' + c.id + '/1">' + A.icon('edit', 'sm') + 'Upravit</a>' : '';
       return '<div class="hist-card"><div class="top"><div><a class="name hist-link" href="' + href + '">' + esc(c.job.name || 'Bez názvu') + '</a>' +
         '<div class="small muted">' + esc(c.job.customer || 'bez zákazníka') + ' · ' + A.fmtDate(c.updatedAt) + '</div></div>' +
         '<div class="price">' + (x.total === null ? '—' : fmt(x.total)) + '</div></div>' +
