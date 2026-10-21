@@ -15,7 +15,8 @@ Na přihlašovací obrazovce stačí klepnout na účet a údaje se vyplní.
 ## Soubory
 - `index.html` – shell, `styles.css` – design a tisk (A4)
 - `patterns.js` – 337 dekorů Floor Forever (vinyl, dřevo, laminát) stažených z eshop.floorforever.cz; náhledy se načítají přímo z e-shopu
-- `data.js` – seed (vzory z `patterns.js`, kolekce a jejich párování, sazby, uživatelé, vzorové kalkulace, SVG textury jako náhrada fotky)
+- `seed-db.js` – výchozí data = snapshot lokální DB (`SEED_DB`, `SEED_VERSION`); používá se při prázdném úložišti, po změně `SEED_VERSION` a při Admin → Reset dat. Přegenerování: v konzoli prototypu spustit `const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([localStorage.getItem('kp_db_v2')],{type:'application/json'}));a.download='kp_db.json';a.click()`, pak `var SEED_DB` přepsat obsahem souboru (`tokens: {}`, bez `seedVersion`) a zvýšit `SEED_VERSION`
+- `data.js` – záložní seed, když `seed-db.js` chybí (vzory z `patterns.js`, kolekce a jejich párování, sazby, uživatelé, vzorové kalkulace, SVG textury jako náhrada fotky)
 - `plan.js` – půdorys schodiště (pohled shora) a kreslený prostorový náhled potažený vybraným vzorem, obojí jen z rozměrů skupin, bez DOM
 - `calc.js` – čisté výpočetní funkce (`computeQuote`, `comparePatterns`, `groupArea`, formátování); lze ověřit v konzoli i v Node (`require('./calc.js')`)
 - `store.js` – localStorage, session, číslování `RRRR-NNNN`

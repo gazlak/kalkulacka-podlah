@@ -7,6 +7,7 @@ var Store = (function () {
   function uid(p) { return (p || 'id') + Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-3); }
 
   function seed() {
+    if (typeof SEED_DB !== 'undefined') { var sd = clone(SEED_DB); sd.tokens = {}; sd.seedVersion = SEED_VERSION; return sd; }
     var d = {
       patterns: clone(DEFAULTS.patterns),
       collections: clone(DEFAULTS.collections),
@@ -56,7 +57,10 @@ var Store = (function () {
     });
   }
   function load() {
-    try { var raw = localStorage.getItem(KEY); if (raw) { db = JSON.parse(raw); if (db && db.users) { if (migrate(db)) save();
+    try { var raw = localStorage.getItem(KEY); if (raw) { db = JSON.parse(raw);
+      // nový snapshot výchozích dat (seed-db.js) nahradí starší uložená data (jednou)
+      if (db && typeof SEED_DB !== 'undefined' && db.seedVersion !== SEED_VERSION) { db = seed(); save(); return db; }
+      if (db && db.users) { if (migrate(db)) save();
       if (!db.rates.m2) { db.rates.m2 = clone(DEFAULTS.rates.m2); db.rates.treadSurcharge = db.rates.treadSurcharge || clone(DEFAULTS.rates.treadSurcharge); save(); }
       // volitelné příplatky (demontáž, vyrovnání) a příplatek za podstupnici byly zrušeny – vyčistí se i z uložených dat
       if ((db.rates.extras || []).length || db.rates.extrasEnabled || db.rates.riserSurcharge !== undefined) { db.rates.extras = []; db.rates.extrasEnabled = false; delete db.rates.riserSurcharge; save(); }
