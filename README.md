@@ -14,6 +14,8 @@ Klikatelný HTML prototyp kalkulačky schodů pro podlaháře. Čisté HTML/CSS/
 | `novak@demo.cz` | `heslo1234` | podlahář |
 | `svoboda@demo.cz` | `heslo1234` | podlahář |
 
+Nový podlahář se může zaregistrovat sám (přihlášení → „Zaregistrovat se“). Účet se aktivuje odkazem z ověřovacího e-mailu. Prototyp e-mail neposílá, jen ukáže jeho náhled s odkazem. Admina lze přidat jen pozvánkou ze Správy.
+
 ## Poznámka k datům
 Ukázková data jsou v `prototyp/data.js` a při prvním spuštění se uloží do `localStorage` prohlížeče. Každý návštěvník má tedy vlastní stav a změny se nesdílejí. Reset: sheet „Prototyp ⚙“ → „Obnovit ukázková data“.
 

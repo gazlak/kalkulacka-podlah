@@ -67,7 +67,7 @@ var DEFAULTS = {
     extrasEnabled: false,
     extras: []  // volitelné příplatky (demontáž, vyrovnání) zrušeny
   },
-  // role: user | admin; status: aktivní | pozván | blokován
+  // role: user | admin; status: aktivní | pozván | neověřen (sám se registroval, čeká na odkaz z e-mailu) | blokován
   users: [
     { id: 'u1', email: 'admin@demo.cz', password: 'admin1234', role: 'admin', status: 'aktivní', failedAttempts: 0, lockedUntil: null,
       profile: { name: 'Eva Admínová', company: 'Podlahy Admin s.r.o.', ico: '12345678', phone: '+420 601 000 001', logo: null } },
