@@ -34,6 +34,7 @@
       ['user', 'admin'].map(function (r) { return '<button type="button" data-click="setRole" data-u="' + u.id + '" data-role="' + r + '" class="' + (u.role === r ? 'on' : '') + '"' + (self ? ' disabled' : '') + '>' + (r === 'admin' ? 'Admin' : 'Uživatel') + '</button>'; }).join('') + '</div>' +
       (self ? '<p class="small muted mt-2">Vlastní roli změnit nelze.</p>' : '') +
       A.sheetList((u.status === 'pozván' ? row('mail', 'Znovu poslat pozvánku', 'data-click="resend"') : '') +
+        (u.status === 'neověřen' ? row('check', 'Ověřit ručně', 'data-click="verifyUser"') : '') +
         (u.status === 'blokován' || locked ? row('key', 'Odblokovat', 'data-click="unblock"') : '') +
         (u.status === 'aktivní' && !self ? row('x', 'Blokovat', 'data-click="block"', true) : '')).replace('<div class="list sheet-list"></div>', '') +
       '<div class="dlg-foot"><button class="btn" data-click="closeModal">Zavřít</button></div>');
@@ -42,11 +43,12 @@
     var u = Store.userById(el.dataset.u); u.role = el.dataset.role; Store.save(); A.closeModal(); A.toast('Role změněna: ' + (u.role === 'admin' ? 'admin' : 'uživatel')); A.dispatch();
   });
   A.on('click', 'block', function (el) { Store.userById(el.dataset.u).status = 'blokován'; Store.save(); A.toast('Uživatel zablokován'); A.dispatch(); });
+  A.on('click', 'verifyUser', function (el) { Store.userById(el.dataset.u).status = 'aktivní'; Store.save(); A.closeModal(); A.toast('Účet ověřen'); A.dispatch(); });
   A.on('click', 'unblock', function (el) {
     var u = Store.userById(el.dataset.u); if (u.status === 'blokován') u.status = 'aktivní'; u.lockedUntil = null; u.failedAttempts = 0; Store.save(); A.toast('Uživatel odblokován'); A.dispatch();
   });
   A.on('click', 'invite', function () {
-    A.modal('<h2>Pozvat uživatele</h2><p class="small muted">Registrace je možná jen na pozvání.</p><form data-submit="doInvite" novalidate>' +
+    A.modal('<h2>Pozvat uživatele</h2><p class="small muted">Podlaháři se mohou registrovat i sami. Pozvánkou založíte účet za někoho jiného nebo přidáte admina.</p><form data-submit="doInvite" novalidate>' +
       '<div class="field"><label for="ie">E-mail</label><input type="email" id="ie" name="email" inputmode="email" autocapitalize="none"><div class="err"></div></div>' +
       '<div class="field"><label for="ir">Role</label><select id="ir" name="role"><option value="user">Uživatel (podlahář)</option><option value="admin">Admin</option></select></div>' +
       '<div class="dlg-foot"><button type="button" class="btn" data-click="closeModal">Zrušit</button><button class="btn primary" type="submit">Vytvořit pozvánku</button></div></form>');

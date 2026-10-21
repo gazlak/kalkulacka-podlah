@@ -101,6 +101,7 @@
     var body = s === 1 ? stepPhotos(c) : s === 2 ? stepStairs(c) : s === 3 ? stepPattern(c) : s === 4 ? stepJob(c) : calcBody(c, true);
     A.render(head + (s > 2 ? stairsSummary(c) : '') + (s < 5 ? priceNotice(c) : '') + body, { title: c.number ? 'Úprava kalkulace' : 'Nová kalkulace', back: '#/history', saved: saved, bar: actionBar(c, s) });
     barUpdate();
+    if (s === 5) Viz.mount(c, ro(c));
     if (W.showErrors) { W.showErrors = false; showStepErrors(c, s); }
   });
   /* kroky 3–5: stručný souhrn zadaných schodů, klepnutím zpět na krok 2 */
@@ -453,6 +454,7 @@
         (f && inf ? ' · výrobní plocha ' + m2(inf.prod) : '') + '</small>' + (f && inf && inf.needsJoint ? JOINT : '') + '</span><span class="v">' + m2(q.areas[i]) + '</span></div>';
     }).join('') : stairRows(c, q)) + lr('Celková plocha (naměřená)', '', m2(q.totalArea), 'tot') + (q.legacy || !f ? '' : lr('Plocha k nářezu', '', m2(q.prodArea)) + lr('Plocha MDF', '', m2(q.mdfArea))) +
       '</div>' + viewCard(c) + planCard(c);
+    html += '<div id="vizCard"></div>';
     if ((c.photos || []).length) html += '<div class="section-title">Fotografie</div>' + photoGrid(c, false);
     if (f) html += trimCard(c, q);
     if (f) html += discountCard(c, pr);
@@ -681,7 +683,7 @@
       '<div id="patFilters">' + patFilters(c) + '</div><div id="fmtBox">' + formatSwitch(c) + '</div><div id="patTiles">' + patTiles(c) + '</div></div></details>' +
       '<div class="err" id="patErr" role="alert"></div>' + viewCard(c) +
       '<div class="section-title">Zakázka</div>' + stepJob(c, true) +
-      '<div class="section-title">Fotografie</div>' + stepPhotos(c, true) +
+      '<div class="section-title">Fotografie</div>' + stepPhotos(c, true) + '<div id="vizCard"></div>' +
       trimCard(c, A.quoteOf(c)) + discountCard(c, pr);
     var rest = '<div class="section-title">Rozpis ceny</div><div id="sums">' + sums(c) + '</div>' + statusCard(c) + A.question('labor') + A.question('laborHours') + (c.number ? A.question('editPrices') : '');
     var bar = '<div class="actionbar stickybar"><div class="inner">' + priceRow() + '<div class="btns">' + backBtn('#/history') + '<button class="btn sq" data-click="moreSheet" aria-label="Další akce">' + ic('more', 'lg') + '</button><button class="btn primary" data-click="saveCalc">Uložit</button></div></div></div>';
@@ -689,6 +691,7 @@
     A.render('<div class="adm-grid" id="adm"><div class="adm-main">' + main + '</div><div class="adm-side"><div class="adm-top">' + top + '</div><div class="adm-rest">' + rest + '</div></div></div>',
       { wide: true, title: 'Kalkulace ' + (c.number || '(koncept)'), back: '#/history', saved: saved, bar: bar });
     barUpdate();
+    Viz.mount(c, false);
   }
 
   A.route('/calc/:id', 'user', function (p, user) {
@@ -702,6 +705,7 @@
     else bar = '<div class="actionbar stickybar"><div class="inner">' + priceRow() + '<div class="btns">' + backBtn('#/history') + '<button class="btn sq" data-click="moreSheet" aria-label="Další akce">' + ic('more', 'lg') + '</button><button class="btn primary" data-click="saveCalc">Uložit změny</button></div></div></div>';
     A.render(body, { title: 'Kalkulace ' + (c.number || '(koncept)'), back: '#/history', bar: bar });
     barUpdate();
+    Viz.mount(c, ro(c));
   });
 
   /* ---------- odeslání e-mailem ---------- */
@@ -739,7 +743,7 @@
       '<div class="pat-line"><img src="' + A.patternImg(pat) + '" alt=""><div><b>' + esc(pat.name) + '</b><br><span class="small">' + fmtUnit(Calc.patternPrice(pr, pat, c.formatId)) + ' / m², prořez ' + nf1.format(q.wastePct) + ' %</span></div></div>' +
       (q.missing && q.missing.length ? '<div class="alert warn">Cena není kompletní: chybí ' + q.missing.map(esc).join(', ') + '.</div>' : '') + (q.needsJoint ? '<p class="small">' + JOINT + ' Šířka schodu je větší než délka lamely.</p>' : '') +
       '<table class="tbl"><tbody>' + row('Celková plocha', m2(q.totalArea), true) + '</tbody></table>' +
-      (SHOW_DRAWINGS ? '<div class="plan view3d">' + viewHtml(c) + '</div><div class="plan">' + planHtml(c) + '</div>' : '') +
+      (SHOW_DRAWINGS ? '<div class="plan view3d">' + viewHtml(c) + '</div><div class="plan">' + planHtml(c) + '</div>' : '') + Viz.pdf(c) +
       '<table class="tbl"><thead><tr><th>Položka</th><th class="num">Množství</th><th class="num">Jedn. cena</th><th class="num">Částka</th></tr></thead><tbody>' +
       q.lines.map(function (l) {
         return '<tr><td>' + esc(l.label) + (l.sub ? '<br><span class="small muted">' + esc(l.sub) + '</span>' : '') + '</td><td class="num">' + nf.format(l.qty) + ' ' + esc(l.unit) + '</td><td class="num">' + (l.unitPrice ? fmtUnit(l.unitPrice) : '') + '</td><td class="num">' + fmt(l.amount) + '</td></tr>';

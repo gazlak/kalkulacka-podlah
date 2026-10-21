@@ -1,0 +1,114 @@
+/* Vizualizace schodů na fotce zákazníka (Gemini přes lokální server.py). Karta na obrazovce kalkulace a v PDF.
+   Kalkulace drží jen cesty k obrázkům (visuals) a počet použitých vizualizací (visualsUsed); limit hlídá i server. */
+var Viz = (function () {
+  'use strict';
+  var A = App, LIMIT = 2, MAX_SIDE = 1600, NOTE = 'Orientační vizualizace – skutečný vzhled se může lišit.';
+  var S = { server: null, used: {}, busy: null, error: null };
+
+  function esc(s) { return A.esc(s); }
+  function used(c) { return Math.max(c.visualsUsed || 0, S.used[c.id] || 0); }
+  function el() { return document.getElementById('vizCard'); }
+
+  function check(c) {
+    if (location.protocol === 'file:') { S.server = false; return draw(); }
+    fetch('api/vizualizace/stav?calc=' + encodeURIComponent(c.id), { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) { S.server = !!(d && d.ok); S.key = !!(d && d.key); if (d) S.used[c.id] = d.used; draw(); })
+      .catch(function () { S.server = false; draw(); });
+  }
+
+  function stairInfo(c) {
+    return { nose: Calc.hasNose(c.groups[0] || {}), stairSide: c.stairSide || 'walls', stairType: Calc.stairType(c).id,
+      landing: c.groups.some(function (g) { return Calc.isLanding(g); }) };
+  }
+
+  function shrink(file, cb, fail) {
+    var url = URL.createObjectURL(file), img = new Image();
+    img.onload = function () {
+      var k = Math.min(1, MAX_SIDE / Math.max(img.width, img.height)), cv = document.createElement('canvas');
+      cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k);
+      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+      URL.revokeObjectURL(url);
+      cb(cv.toDataURL('image/jpeg', 0.88));
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); fail('Fotku se nepodařilo načíst. Použijte JPG nebo PNG (HEIC z iPhonu otevře jen Safari).'); };
+    img.src = url;
+  }
+
+  function card(c, readOnly) {
+    var n = used(c), list = c.visuals || [], h = '<div class="section-title">Vizualizace na fotce</div><div class="card viz">';
+    h += list.map(function (v, i) {
+      return '<figure class="viz-item"><img src="' + esc(v.url) + '" alt="Vizualizace schodů ' + (i + 1) + '">' +
+        '<figcaption><img class="viz-orig" src="' + esc(v.original) + '" alt="Původní fotka"><span class="small"><b>' + esc(v.patternName) + '</b><br>' +
+        '<span class="muted">' + NOTE + '</span></span>' +
+        (readOnly ? '' : '<button class="btn sm ghost" data-click="vizDel" data-i="' + i + '">Smazat</button>') + '</figcaption></figure>';
+    }).join('');
+    if (S.busy === c.id) h += '<div class="viz-busy"><span class="spin"></span>Připravuji vizualizaci… (asi 10–20 s)</div>';
+    if (S.error) h += '<div class="alert warn">' + esc(S.error) + '</div>';
+    if (!readOnly) {
+      if (S.server === false) h += '<p class="small muted">Vizualizace funguje jen přes lokální server (python3 prototyp/server.py).</p>';
+      else if (S.server && !S.key) h += '<p class="small muted">Server nemá klíč ke Gemini (GEMINI_API_KEY nebo ~/.config/gemini/api_key).</p>';
+      else if (n >= LIMIT) h += '<p class="small muted">Limit vizualizací pro tuto kalkulaci je vyčerpán (' + LIMIT + '/' + LIMIT + ').</p>';
+      else {
+        if (!list.length) h += '<p class="small muted">Nahrajte fotku schodů a ukážeme, jak na nich bude vybraný vinyl vypadat. Nejvýš ' + LIMIT + ' vizualizace na kalkulaci.</p>';
+        h += '<label class="btn block' + (S.busy || S.server === null ? ' disabled' : '') + '">' + A.icon('plus') + 'Nahrát fotku schodů' +
+          '<input type="file" class="sr" accept="image/*" aria-label="Nahrát fotku schodů" data-change="vizFile"' + (S.busy || S.server === null ? ' disabled' : '') + '></label>' +
+          '<p class="small muted mt-2">Zbývá ' + (LIMIT - n) + ' z ' + LIMIT + '.</p>';
+      }
+    } else if (!list.length) h += '<p class="small muted">Bez vizualizace.</p>';
+    return h + '</div>';
+  }
+
+  var cur = null, curRo = false;
+  function draw() { var e = el(); if (e && cur) e.innerHTML = card(cur, curRo); }
+
+  /* volá wizard po vykreslení obrazovky kalkulace */
+  function mount(c, readOnly) {
+    if (cur !== c) S.error = null;
+    cur = c; curRo = readOnly;
+    draw();
+    if (S.server === null || !(c.id in S.used)) check(c);
+  }
+
+  A.on('change', 'vizFile', function (input) {
+    var c = cur, file = input.files && input.files[0];
+    input.value = '';
+    if (!c || !file || S.busy) return;
+    if (file.size > 30 * 1024 * 1024) { S.error = 'Fotka je příliš velká.'; return draw(); }
+    var pat = Calc.findPattern(A.pricingOf(c), c.patternId);
+    S.error = null; S.busy = c.id; draw();
+    function done(msg) { S.busy = null; S.error = msg || null; draw(); }
+    shrink(file, function (photo) {
+      fetch('api/vizualizace', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ calcId: c.id, photo: photo, pattern: { name: pat.name, photo: pat.photo || '' }, stair: stairInfo(c) }) })
+        .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, d: d }; }); })
+        .then(function (res) {
+          if (res.d.used != null) S.used[c.id] = res.d.used;
+          if (!res.ok) return done(res.d.error || 'Vizualizace se nepodařila.');
+          c.visuals = (c.visuals || []).concat([{ url: res.d.url, original: res.d.original, patternId: c.patternId, patternName: pat.name, createdAt: Date.now() }]);
+          c.visualsUsed = res.d.used;
+          c.updatedAt = Date.now(); Store.upsertCalc(c);
+          done();
+        })
+        .catch(function () { done('Server neodpovídá. Běží python3 prototyp/server.py?'); });
+    }, done);
+  });
+
+  A.on('click', 'vizDel', function (b) {
+    var c = cur, i = +b.dataset.i;
+    if (!c || !c.visuals || !c.visuals[i]) return;
+    A.confirmDlg('Smazat vizualizaci?', 'Smazáním se limit nevrací (' + used(c) + '/' + LIMIT + ' použito).', 'Smazat', function () {
+      c.visuals.splice(i, 1); c.updatedAt = Date.now(); Store.upsertCalc(c); draw();
+    }, true);
+  });
+
+  /* sekce do PDF náhledu: poslední vizualizace */
+  function pdf(c) {
+    var v = (c.visuals || [])[(c.visuals || []).length - 1];
+    if (!v) return '';
+    return '<div class="pdf-viz"><h3>Vizualizace</h3><img src="' + esc(v.url) + '" alt="Vizualizace schodů"><p class="small muted">' +
+      esc(v.patternName) + ' · ' + NOTE + '</p></div>';
+  }
+
+  return { mount: mount, pdf: pdf, card: card, LIMIT: LIMIT };
+})();

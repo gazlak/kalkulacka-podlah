@@ -264,6 +264,7 @@ body.present .qrow, body.present .qchip, body.present [data-qonly] { display: no
 .st-aktivní { background: var(--ok-soft); color: var(--ok); }
 .st-pozván, .st-předáno { background: var(--warn-soft); color: var(--warn); }
 .st-blokován { background: var(--bad-soft); color: var(--bad); }
+.st-neověřen { background: var(--warn-soft); color: var(--warn); }
 .dot { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); font-weight: 600; }
 .dot::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
 .dot.st-koncept, .dot.st-předáno, .dot.st-odesláno, .dot.st-přijato, .dot.st-zamítnuto { background: none; }
@@ -476,6 +477,9 @@ body.has-bar #toast { bottom: calc(160px + var(--safe-b)); }
 .auth-brand h1 { font-size: var(--fs-lg); }
 .auth-brand p { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
 .demo-accounts { margin-top: var(--s-3); }
+.field .check.terms { display: flex; margin: 0; }
+.check.terms span { display: block; font-weight: 400; font-size: var(--fs-sm); line-height: 1.4; }
+.auth-alt { text-align: center; font-size: var(--fs-sm); color: var(--muted); margin: var(--s-3) 0; }
 .demo-accounts > summary { cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; min-height: var(--h-btn-sm); font-weight: 600; font-size: var(--fs-sm); color: var(--accent-ink); }
 .demo-accounts > summary::-webkit-details-marker { display: none; }
 .demo-accounts[open] > summary .ic { transform: rotate(180deg); }
@@ -576,6 +580,19 @@ html { scroll-padding-top: 72px; scroll-padding-bottom: 180px; }
 .fmt-switch { margin: var(--s-3) 0; }
 .imp-list { margin: var(--s-1) 0 var(--s-3); padding-left: var(--s-4); font-size: var(--fs-sm); }
 
+/* vizualizace schodů na fotce (viz.js) */
+.viz-item { margin: 0 0 var(--s-3); }
+.viz-item > img { width: 100%; border-radius: 10px; display: block; }
+.viz-item figcaption { display: flex; gap: var(--s-2); align-items: center; margin-top: var(--s-2); }
+.viz-item figcaption > span { flex: 1; min-width: 0; }
+.viz-orig { width: 64px; height: 64px; object-fit: cover; border-radius: 6px; flex: none; }
+.viz-busy { display: flex; gap: var(--s-2); align-items: center; padding: var(--s-3) 0; color: var(--muted); }
+.viz-busy .spin { width: 18px; height: 18px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: vizspin .8s linear infinite; }
+@keyframes vizspin { to { transform: rotate(360deg); } }
+.btn.disabled { opacity: .45; pointer-events: none; }
+.pdf-sheet .pdf-viz { margin: var(--s-4) 0; break-inside: avoid; }
+.pdf-sheet .pdf-viz h3 { font-size: 1rem; margin-bottom: 6px; }
+.pdf-sheet .pdf-viz img { width: 100%; max-height: 520px; object-fit: contain; border-radius: 6px; }
 /* fotografie */
 .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-2); margin-bottom: var(--s-3); }
 .photo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-2); }

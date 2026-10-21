@@ -254,7 +254,8 @@ var App = (function () {
       '<label class="check"><span>Zapamatovat si mě (30 dní)</span><input type="checkbox" name="remember"></label>' +
       '<button class="btn primary block mt" type="submit">Přihlásit se</button></form>' +
       '<a class="btn ghost block mt-2" href="#/forgot">Zapomenuté heslo</a></div>' +
-      '<details class="card demo-accounts"><summary>Demo účty (ukázková data)' + A.icon('chev-d') + '</summary><p class="small muted mt-2">Klepnutím vyplníte přihlašovací údaje. V ostré verzi nebude veřejná registrace – jen pozvánka od správce.</p><div class="demo-chips">' + demo + '</div></details>' +
+      '<p class="auth-alt">Nemáte účet? <a href="#/register">Zaregistrovat se</a></p>' +
+      '<details class="card demo-accounts"><summary>Demo účty (ukázková data)' + A.icon('chev-d') + '</summary><p class="small muted mt-2">Klepnutím vyplníte přihlašovací údaje.</p><div class="demo-chips">' + demo + '</div></details>' +
       A.question('firms') + '</div>', { bare: true });
   });
   A.on('click', 'fillLogin', function (el) {
@@ -269,6 +270,11 @@ var App = (function () {
     if (u.lockedUntil && u.lockedUntil > Date.now()) return lockMsg(u);
     if (u.status === 'blokován') return showLoginErr('Účet je zablokovaný. Kontaktujte správce.');
     if (u.status === 'pozván') return showLoginErr('Registrace ještě není dokončena – použijte odkaz z pozvánky.');
+    if (u.status === 'neověřen') {
+      document.getElementById('loginErr').innerHTML = '<div class="alert warn" role="alert">E-mail ještě není ověřený. Klepněte na odkaz, který jsme poslali na ' + esc(u.email) + '.' +
+        '<button type="button" class="btn sm block mt-2" data-click="resendVerify" data-u="' + u.id + '">Poslat ověřovací e-mail znovu</button></div><div id="verifyOut"></div>';
+      return;
+    }
     if (u.password !== pw) {
       u.failedAttempts = (u.failedAttempts || 0) + 1;
       if (u.failedAttempts >= MAX_ATTEMPTS) { u.lockedUntil = Date.now() + LOCK_MS; u.failedAttempts = 0; Store.save(); return lockMsg(u); }
@@ -357,6 +363,68 @@ var App = (function () {
     if (form.elements.name.value.trim()) t.user.profile.name = form.elements.name.value.trim();
     delete Store.db.tokens[form.dataset.token]; Store.save();
     A.toast('Účet je aktivní, přihlaste se'); A.go('/login');
+  });
+
+  /* ---------- registrace ---------- */
+  var VERIFY_MS = 24 * 3600000;
+  A.route('/register', 'guest', function () {
+    A.render('<div class="auth">' + authBrand('Registrace', 'Účet pro podlahářskou firmu. Kalkulace uvidíte jen vy.') + '<div class="card">' +
+      '<form data-submit="register" novalidate>' +
+      '<div class="field"><label for="rc">Firma</label><input type="text" id="rc" name="company" autocomplete="organization"><div class="err"></div></div>' +
+      '<div class="field"><label for="ri">IČO <span class="opt">(volitelné)</span></label><input type="text" id="ri" name="ico" inputmode="numeric" maxlength="8"><div class="err"></div></div>' +
+      '<div class="field"><label for="rn">Jméno a příjmení</label><input type="text" id="rn" name="name" autocomplete="name"><div class="err"></div></div>' +
+      '<div class="field"><label for="re">E-mail</label><input type="email" id="re" name="email" autocomplete="username" inputmode="email" autocapitalize="none"><div class="err"></div></div>' +
+      pwBlock('pw', 'Heslo') + '<div class="field"><label for="pw2">Heslo znovu</label><input type="password" id="pw2" name="pw2" autocomplete="new-password"><div class="err"></div></div>' +
+      '<div class="field"><label class="check terms"><span>Souhlasím s obchodními podmínkami a zpracováním osobních údajů</span><input type="checkbox" name="terms"></label><div class="err"></div></div>' +
+      '<button class="btn primary block mt" type="submit">Vytvořit účet</button></form></div>' +
+      '<p class="auth-alt">Už máte účet? <a href="#/login">Přihlásit se</a></p><div id="registerOut"></div></div>', { bare: true });
+  });
+  function verifyMail(u) {
+    var tok = Store.makeToken('verify', u.id, VERIFY_MS);
+    return '<div class="card"><h3 class="mb">Demo: náhled e-mailu</h3>' + A.mailPreview({
+      to: u.email, subject: 'Ověření e-mailu – Kalkulačka schodů',
+      bodyHtml: '<p>Dobrý den,</p><p>děkujeme za registraci. Účet aktivujete klepnutím na odkaz. <b>Odkaz platí 24 hodin.</b></p><p><a href="#/verify/' + tok + '">Ověřit e-mail</a></p><p class="muted">Pokud jste se neregistrovali, tento e-mail ignorujte.</p>'
+    }) + '<a class="btn primary block" href="#/verify/' + tok + '">Otevřít odkaz (demo)</a></div>';
+  }
+  A.on('submit', 'register', function (form) {
+    var el = form.elements, ok = true, mail = el.email.value.trim(), ico = el.ico.value.replace(/\s/g, '');
+    function need(inp, cond, msg) { A.setErr(inp, cond ? '' : msg); if (!cond) ok = false; }
+    need(el.company, el.company.value.trim(), 'Vyplňte název firmy');
+    need(el.ico, !ico || /^\d{8}$/.test(ico), 'IČO má 8 číslic');
+    need(el.name, el.name.value.trim(), 'Vyplňte jméno');
+    need(el.email, /^\S+@\S+\.\S+$/.test(mail), 'Zadejte platný e-mail');
+    if (!checkPw(form)) ok = false;
+    need(el.terms, el.terms.checked, 'Bez souhlasu účet nevytvoříme');
+    if (!ok) return;
+    var u = Store.userByEmail(mail), out = '';
+    if (!u) {
+      u = { id: Store.uid('u'), email: mail, password: el.pw.value, role: 'user', status: 'neověřen', failedAttempts: 0, lockedUntil: null, createdAt: Date.now(),
+        profile: { name: el.name.value.trim(), company: el.company.value.trim(), ico: ico, phone: '', logo: null } };
+      Store.db.users.push(u); Store.save();
+      out = verifyMail(u);
+    } else if (u.status === 'neověřen') {
+      out = verifyMail(u);
+    } else {
+      out = '<p class="small muted">(Demo: e-mail už má účet ve stavu „' + esc(u.status) + '“. V ostré verzi mu přijde upozornění s odkazem na přihlášení a obnovu hesla, odpověď na obrazovce je stejná.)</p>';
+    }
+    // stejná odpověď pro nový i existující e-mail – registrace neprozradí, kdo už účet má
+    form.closest('.card').innerHTML = '<div class="alert ok">Poslali jsme ověřovací odkaz na <b>' + esc(mail) + '</b>. Účet aktivujete klepnutím na odkaz v e-mailu (platí 24 hodin).</div>' +
+      '<a class="btn ghost block mt-2" href="#/login">' + A.icon('back') + 'Na přihlášení</a>';
+    document.getElementById('registerOut').innerHTML = out;
+  });
+  A.on('click', 'resendVerify', function (el) {
+    var u = Store.userById(el.dataset.u), out = document.getElementById('verifyOut');
+    if (u && u.status === 'neověřen' && out) out.innerHTML = verifyMail(u);
+  });
+  A.route('/verify/:token', 'public', function (p) {
+    var t = tokenOf(p.token, 'verify');
+    if (t.err || !t.user || t.user.status !== 'neověřen') return A.render('<div class="auth">' + authBrand('Ověření e-mailu') + '<div class="card"><div class="alert err">' + esc(t.err || 'Odkaz už byl použit.') +
+      ' Ověřovací odkaz platí 24 hodin. Nový pošleme po pokusu o přihlášení.</div><a class="btn primary block" href="#/login">Na přihlášení</a></div></div>', { bare: true });
+    t.user.status = 'aktivní';
+    delete Store.db.tokens[p.token]; Store.save();
+    Store.setSession(t.user.id, false);
+    A.toast('E-mail ověřen, účet je aktivní');
+    A.go('/history');
   });
 
   /* ---------- historie ---------- */

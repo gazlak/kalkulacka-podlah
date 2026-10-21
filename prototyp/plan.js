@@ -2,6 +2,9 @@
  * Skupina 1 je dole, první schod úplně dole, další navazují ve směru výstupu.
  * Rovný schod = obdélník šířka × hloubka. Šikmý schod = lichoběžník z hloubky vlevo a vpravo,
  * schodiště se na něm stáčí ke straně s menší hloubkou – o kolik, to vyjde z rozměrů.
+ * Rovnoramenné schodiště = ramena vedle sebe, na podestě se otáčí o 180° (druhé rameno se vrací vpravo).
+ * Točité schodiště (pravotočivé / levotočivé) se má otočit celkem o 90° (do L) nebo 180° (do U): co neotočí šikmé schody,
+ * otočí se na podestách (po 90° nebo 180°).
  * Zatáčka ze šikmých schodů, která vyjde na 90° nebo 180°, se kreslí do pravoúhlého rohu: vnější hrana jde po stěnách. */
 var Plan = (function () {
   var n0 = Calc.n0, DEG = 180 / Math.PI;
@@ -72,7 +75,19 @@ var Plan = (function () {
    * back = index hrany obrysu, která je zadní hranou schodu. */
   function layout(groups, stairType, side) {
     var steps = expand(groups);
-    var st = { mode: 'center', p: [0, 0], u: [0, 1] }, turn = 0;
+    var turnTo = Calc.STAIR_TYPES.filter(function (t) { return t.id === stairType; }).concat([{ turn: 0 }])[0].turn;
+    var dir = turnTo < 0 ? -1 : turnTo > 0 ? 1 : 0, target = Math.abs(turnTo); // kladný úhel = doleva
+    // kolik stupňů připadá na jednu podestu
+    var wedge = 0, landings = 0;
+    steps.forEach(function (s) {
+      if (s.landing && s.dl === s.dr) landings++;
+      else wedge += Math.atan2(s.dr - s.dl, s.w) * DEG;
+    });
+    // rovnoramenné: dvě ramena vedle sebe, na každé podestě otočka o 180° (druhé rameno se vrací vpravo, nebo vlevo podle volby)
+    var perLanding = !landings ? 0 : dir ? Math.max(0, Math.min(2, Math.round((target - wedge * dir) / landings / 90))) * 90 : 180;
+    var ld = dir || (side === 'left' ? 1 : -1);
+
+    var st = { mode: 'center', p: [0, 0], u: [0, 1] }, prev = null, turn = 0;
     steps.forEach(function (s) {
       var u = st.u, r = right(u), L, R, L2, R2;
       L = st.mode === 'center' ? add(st.p, r, -s.w / 2) : st.mode === 'left' ? st.p : add(st.p, r, -s.w);
@@ -135,8 +150,9 @@ var Plan = (function () {
     if (!r) return '<p class="small muted" style="margin:0">Půdorys se nakreslí po vyplnění rozměrů.</p>';
     var t = Math.round(Math.abs(r.turnDeg)), note = 'Pohled shora · skupina 1 je dole, šipka ukazuje směr výstupu';
     if (t >= 1) note += ' · otočení ' + t + '°';
-    var warn = stairType && stairType !== 'straight' && Math.abs(t - 180) > 5
-      ? '<p class="small plan-warn">Točité schodiště má vyjít na 180°, z rozměrů vychází ' + t + '°. Upravte hloubky šikmých schodů.</p>' : '';
+    var target = Math.abs(Calc.STAIR_TYPES.filter(function (x) { return x.id === stairType; }).concat([{ turn: 0 }])[0].turn);
+    var warn = target && Math.abs(t - target) > 5
+      ? '<p class="small plan-warn">Schodiště má vyjít na ' + target + '°, z rozměrů vychází ' + t + '°. Upravte hloubky šikmých schodů nebo doplňte podestu.</p>' : '';
     return r.svg + '<p class="small muted plan-note">' + note + '</p>' + warn;
   }
 
