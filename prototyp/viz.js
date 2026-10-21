@@ -3,7 +3,8 @@
 var Viz = (function () {
   'use strict';
   var A = App, LIMIT = 2, MAX_SIDE = 1600, NOTE = 'Orientační vizualizace – skutečný vzhled se může lišit.';
-  var S = { server: null, used: {}, busy: null, error: null };
+  var S = { server: null, used: {}, busy: null, error: null, mode: {}, cut: {} };
+  var MODES = [['po', 'Vizualizace'], ['pred', 'Původní fotka'], ['cmp', 'Porovnat']];
 
   function esc(s) { return A.esc(s); }
   function used(c) { return Math.max(c.visualsUsed || 0, S.used[c.id] || 0); }
@@ -38,8 +39,17 @@ var Viz = (function () {
   function card(c, readOnly) {
     var n = used(c), list = c.visuals || [], h = '<div class="section-title">Vizualizace na fotce</div><div class="card viz">';
     h += list.map(function (v, i) {
-      return '<figure class="viz-item"><img src="' + esc(v.url) + '" alt="Vizualizace schodů ' + (i + 1) + '">' +
-        '<figcaption><img class="viz-orig" src="' + esc(v.original) + '" alt="Původní fotka"><span class="small"><b>' + esc(v.patternName) + '</b><br>' +
+      var mode = S.mode[i] || 'po', cut = S.cut[i] == null ? 50 : S.cut[i], stage;
+      if (mode === 'cmp') stage = '<img src="' + esc(v.original) + '" alt="Původní fotka">' +
+        '<div class="viz-after" style="clip-path:inset(0 0 0 ' + cut + '%)"><img src="' + esc(v.url) + '" alt="Vizualizace schodů ' + (i + 1) + '"></div>' +
+        '<span class="viz-line" style="left:' + cut + '%"></span><span class="viz-tag l">Před</span><span class="viz-tag r">Po</span>' +
+        '<input type="range" class="viz-range" min="0" max="100" value="' + cut + '" aria-label="Porovnání před a po" data-input="vizSlide" data-i="' + i + '">';
+      else stage = '<button type="button" class="viz-zoom" data-click="vizZoom" data-i="' + i + '" aria-label="Zvětšit"><img src="' + esc(mode === 'pred' ? v.original : v.url) + '" alt="' +
+        (mode === 'pred' ? 'Původní fotka' : 'Vizualizace schodů ' + (i + 1)) + '"></button>';
+      return '<figure class="viz-item"><div class="seg full viz-seg" role="group" aria-label="Zobrazení">' + MODES.map(function (m) {
+          return '<button type="button" data-click="vizMode" data-i="' + i + '" data-m="' + m[0] + '" class="' + (m[0] === mode ? 'on' : '') + '" aria-pressed="' + (m[0] === mode) + '">' + m[1] + '</button>';
+        }).join('') + '</div><div class="viz-stage' + (mode === 'cmp' ? ' cmp' : '') + '">' + stage + '</div>' +
+        '<figcaption><span class="small"><b>' + esc(v.patternName) + '</b><br>' +
         '<span class="muted">' + NOTE + '</span></span>' +
         (readOnly ? '' : '<button class="btn sm ghost" data-click="vizDel" data-i="' + i + '">Smazat</button>') + '</figcaption></figure>';
     }).join('');
@@ -94,11 +104,22 @@ var Viz = (function () {
     }, done);
   });
 
+  A.on('click', 'vizMode', function (b) { S.mode[+b.dataset.i] = b.dataset.m; draw(); });
+  A.on('input', 'vizSlide', function (el) { // bez překreslení, jen posun hranice
+    var i = +el.dataset.i, v = +el.value, st = el.closest('.viz-stage');
+    S.cut[i] = v; st.querySelector('.viz-after').style.clipPath = 'inset(0 0 0 ' + v + '%)'; st.querySelector('.viz-line').style.left = v + '%';
+  });
+  A.on('click', 'vizZoom', function (b) {
+    var c = cur, i = +b.dataset.i, v = c && (c.visuals || [])[i]; if (!v) return;
+    var pred = (S.mode[i] || 'po') === 'pred';
+    A.modal('<h2>' + (pred ? 'Původní fotka' : 'Vizualizace – ' + esc(v.patternName)) + '</h2><img class="viz-big" src="' + esc(pred ? v.original : v.url) + '" alt="">' +
+      '<div class="dlg-foot"><a class="btn" href="' + esc(pred ? v.original : v.url) + '" target="_blank" rel="noopener">Otevřít v plné velikosti</a><button class="btn primary" data-click="closeModal">Zavřít</button></div>');
+  });
   A.on('click', 'vizDel', function (b) {
     var c = cur, i = +b.dataset.i;
     if (!c || !c.visuals || !c.visuals[i]) return;
     A.confirmDlg('Smazat vizualizaci?', 'Smazáním se limit nevrací (' + used(c) + '/' + LIMIT + ' použito).', 'Smazat', function () {
-      c.visuals.splice(i, 1); c.updatedAt = Date.now(); Store.upsertCalc(c); draw();
+      c.visuals.splice(i, 1); S.mode = {}; S.cut = {}; c.updatedAt = Date.now(); Store.upsertCalc(c); draw();
     }, true);
   });
 

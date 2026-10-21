@@ -203,6 +203,65 @@ var Calc = (function () {
     return { strips: strips, lamellas: lamel, area: lamel * L * Wl / 1e6, needsJoint: needsJoint };
   }
 
+  /* Optimalizovaný nářez celé kalkulace z lamel L × Wl (mm).
+   * Každý dílec (nášlap s rezervou, podstupnice) = plné pruhy v šířce lamely + doplňkový pruh (zbytek výšky).
+   * 1) Doplňkové pruhy se podélně skládají do společných pruhů (kus smí být kratší než pruh, ve kterém leží).
+   * 2) Plné pruhy a pruhy s doplňky se skládají za sebe do lamel (nejdelší první), s šířkou řezu pily.
+   * 3) Volba joinRest: pruh s doplňky smí být nastavený z kratších odřezků (aspoň MIN_SEG mm) – zaplní zbytky lamel.
+   * Pruh delší než lamela (široký schod) se nastavuje vždy. Vrací počet lamel, plochu a plán řezů po lamelách. */
+  var MIN_SEG = 150;
+  function cutPlan(groups, rates, coll) {
+    var L = coll ? n0(coll.lamellaLengthMm) : 0, Wl = coll ? n0(coll.lamellaWidthMm) : 0;
+    if (!(L > 0 && Wl > 0)) return null;
+    var kerf = rates.kerfMm == null ? 3 : n0(rates.kerfMm), join = !!rates.joinRest, full = [], rest = [], need = 0;
+    groups.forEach(function (g, gi) {
+      var dm = pieceDims(g, rates), W = Math.round(dm.w * 10), n = n0(g.count);
+      [['nášlap', dm.dMax * 10], ['podstupnice', dm.r * 10]].forEach(function (part) {
+        var h = part[1]; if (!(h > 0)) return;
+        var k = Math.floor(h / Wl + 1e-9), r = h - k * Wl;
+        for (var i = 0; i < n; i++) {
+          for (var j = 0; j < k; j++) full.push({ len: W, label: part[0], g: gi });
+          if (r > 0.5) rest.push({ len: W, h: r, label: part[0], g: gi });
+        }
+        need += W * h * n;
+      });
+    });
+    // 1) doplňkové pruhy do společných pruhů (first-fit decreasing podle délky, pak výšky)
+    rest.sort(function (a, b) { return b.len - a.len || b.h - a.h; });
+    var bins = [];
+    rest.forEach(function (p) {
+      var b = bins.filter(function (x) { return x.free >= p.h + (x.items.length ? kerf : 0) && p.len <= x.len; })[0];
+      if (!b) { b = { len: p.len, free: Wl, items: [] }; bins.push(b); }
+      b.free -= p.h + (b.items.length ? kerf : 0); b.items.push(p);
+    });
+    // 2) bloky do lamel
+    var lam = [];
+    function place(len, desc) {
+      var t = lam.filter(function (x) { return x.free >= len + (x.cuts.length ? kerf : 0); })
+        .sort(function (a, b) { return a.free - b.free; })[0]; // nejtěsnější volná lamela
+      if (!t) { t = { free: L, cuts: [] }; lam.push(t); }
+      t.free -= len + (t.cuts.length ? kerf : 0); t.cuts.push({ len: len, desc: desc });
+    }
+    function placeSplit(len, desc) { // nastavení: zbytky lamel od největšího, nejméně MIN_SEG
+      var left = len, part = 0;
+      while (left > 0.5) {
+        var t = lam.filter(function (x) { return x.free - (x.cuts.length ? kerf : 0) >= Math.min(MIN_SEG, left); }).sort(function (a, b) { return b.free - a.free; })[0];
+        if (!t) { t = { free: L, cuts: [] }; lam.push(t); }
+        var take = Math.min(left, t.free - (t.cuts.length ? kerf : 0));
+        t.free -= take + (t.cuts.length ? kerf : 0); t.cuts.push({ len: take, desc: desc + (take < left || part ? ' (díl ' + (++part) + ')' : '') }); left -= take;
+      }
+    }
+    var blocks = full.map(function (f) { return { len: f.len, desc: f.label + ' – plný pruh', split: f.len > L }; })
+      .concat(bins.map(function (b) {
+        return { len: b.len, split: join || b.len > L, desc: 'doplňky: ' + b.items.map(function (i) { return i.label + ' ' + Math.round(i.h) + ' mm'; }).join(' + ') };
+      }));
+    blocks.filter(function (b) { return !b.split; }).sort(function (a, b) { return b.len - a.len; }).forEach(function (b) { place(b.len, b.desc); });
+    blocks.filter(function (b) { return b.split; }).sort(function (a, b) { return b.len - a.len; }).forEach(function (b) { placeSplit(b.len, b.desc); });
+    var area = lam.length * L * Wl / 1e6;
+    return { lamellas: lam.length, area: area, needArea: need / 1e6, usePct: area > 0 ? need / 1e6 / area * 100 : 0,
+      fullStrips: full.length, restPieces: rest.length, restStrips: bins.length, join: join, kerf: kerf, L: L, Wl: Wl, plan: lam };
+  }
+
   /* Lišta a hrana. Strana u zdi jde do lišty, otevřená strana do hrany. Délka strany = hloubka té strany
    * (+ výška podstupnice, když se obkládá), z NAMĚŘENÝCH rozměrů. Tady se mění způsob vedení lišty. */
   function sideRuns(groups, stairSide) {
@@ -237,6 +296,11 @@ var Calc = (function () {
       treads += n; if (g.coverRiser) { riserTreads += n; riserCount += n; }
       var tt = treadType(g).id; hours += n * n0((d.hours || {})[tt]); surchargeRaw += n * n0(sur[tt]);
     });
+    var cp = !usePct ? cutPlan(groups, rates, coll) : null;
+    if (cp) { // globální nářez nahrazuje součet po skupinách; spotřeba skupin podle podílu výrobní plochy
+      consumption = cp.area; lamellas = cp.lamellas; anyLamella = true;
+      info.forEach(function (x) { x.consumption = prodArea > 0 ? cp.area * x.prod / prodArea : 0; x.lamellas = null; x.wastePct = prodArea > 0 ? (cp.area / prodArea - 1) * 100 : 0; });
+    }
     var wastePct = prodArea > 0 ? (consumption / prodArea - 1) * 100 : wastePctPat;
     var lines = [];
     function ln(key, label, qty, unit, unitPrice, sub) {
@@ -245,10 +309,11 @@ var Calc = (function () {
       return amount;
     }
     var res = 1 + d.reserve, missing = [];
-    var vinylQty = consumption * (d.reserveOnVinyl ? res : 1);
+    // rezerva na vstupy jde jen na lepidlo; na vinyl volitelně a jen v paušálním režimu (lamely z nářezového plánu jsou celé i s odřezky)
+    var vinylRes = d.reserveOnVinyl && !cp, vinylQty = consumption * (vinylRes ? res : 1);
     var material = ln('material', 'Vinyl', vinylQty, 'm²', price,
-      (anyLamella && !usePct ? lamellas + ' lamel, ' : '') + 'prořez ' + String(Math.round(wastePct * 10) / 10).replace('.', ',') + ' %' + (d.reserveOnVinyl && d.reserve ? ', vč. rezervy' : ''));
-    var mdf = ln('mdf', 'Podklad MDF', mdfArea * res, 'm²', d.mdfPerM2, 'rezerva ' + Math.round(d.reserve * 1000) / 10 + ' %');
+      (anyLamella && !usePct ? lamellas + ' lamel, ' : '') + 'prořez ' + String(Math.round(wastePct * 10) / 10).replace('.', ',') + ' %' + (vinylRes && d.reserve ? ', vč. rezervy' : ''));
+    var mdf = ln('mdf', 'Podklad MDF', mdfArea, 'm²', d.mdfPerM2, 'z rozměrů dílců vč. rezervy na ořez'); // bez rezervy na vstupy – ořez je už v rozměrech
     var glueQty = (prodArea + (d.glueLayers === 2 ? mdfArea : 0)) * res;
     var glue = ln('glue', 'Lepidlo', glueQty, 'm²', d.gluePerM2, d.glueLayers + '× nános');
     var hourly = d.hourly === null ? 0 : d.hourly;
@@ -273,7 +338,7 @@ var Calc = (function () {
     var base = subtotal - discountAmount, vat = roundTo(base * vatRate, step);
     return {
       legacy: false, lines: lines, missing: missing, areas: areas, totalArea: totalArea, prodArea: prodArea, mdfArea: mdfArea,
-      groupsInfo: info, needsJoint: needsJoint, lamellas: anyLamella ? lamellas : null,
+      groupsInfo: info, needsJoint: needsJoint, lamellas: anyLamella ? lamellas : null, cutPlan: cp,
       trim: { bm: trimBm, perBm: d.trimPerBm, amount: trim }, edge: { bm: edgeBm, perBm: d.edgePerBm, amount: edge },
       autoTrimBm: runs.trimBm, autoEdgeBm: runs.edgeBm,
       treads: treads, riserTreads: riserTreads, wastePct: wastePct,
@@ -321,7 +386,7 @@ var Calc = (function () {
     num: num, n0: n0, roundTo: roundTo, groupArea: groupArea, computeQuote: computeQuote,
     comparePatterns: comparePatterns, computeExtras: computeExtras, formatCZK: formatCZK, formatM2: formatM2,
     validateGroup: validateGroup, findPattern: findPattern, isSkewed: isSkewed, depthOf: depthOf, depthLabel: depthLabel,
-    isLegacy: isLegacy, collectionOf: collectionOf, patternPrice: patternPrice, patternOffered: patternOffered, pieceDims: pieceDims, lamellaUse: lamellaUse, sideRuns: sideRuns, defaults: defaults,
+    isLegacy: isLegacy, collectionOf: collectionOf, patternPrice: patternPrice, patternOffered: patternOffered, pieceDims: pieceDims, lamellaUse: lamellaUse, cutPlan: cutPlan, sideRuns: sideRuns, defaults: defaults,
     STAIR_TYPES: STAIR_TYPES, TREAD_TYPES: TREAD_TYPES, stairType: stairType, treadType: treadType, STEP_KINDS: STEP_KINDS, stepKind: stepKind, hasNose: hasNose, m2Rates: m2Rates
   };
 })();

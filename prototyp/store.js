@@ -6,8 +6,17 @@ var Store = (function () {
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
   function uid(p) { return (p || 'id') + Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-3); }
 
+  /* ukázková vizualizace na fotce u točitého schodiště c6 (soubory v ukazky/, bez volání Gemini) */
+  function demoViz(d) {
+    d.demoViz = 1;
+    var c = d.calculations.filter(function (x) { return x.id === 'c6'; })[0];
+    if (!c || (c.visuals || []).length) return d;
+    c.visuals = [{ url: 'ukazky/c6-vizualizace.jpg', original: 'ukazky/c6-foto.jpg', patternId: c.patternId, patternName: '6014 DUB ALVIO LEPENÁ 0,5', createdAt: Date.now(), demo: true }];
+    c.visualsUsed = Math.max(c.visualsUsed || 0, 1);
+    return d;
+  }
   function seed() {
-    if (typeof SEED_DB !== 'undefined') { var sd = clone(SEED_DB); sd.tokens = {}; sd.seedVersion = SEED_VERSION; return sd; }
+    if (typeof SEED_DB !== 'undefined') { var sd = clone(SEED_DB); sd.tokens = {}; sd.seedVersion = SEED_VERSION; return demoViz(sd); }
     var d = {
       patterns: clone(DEFAULTS.patterns),
       collections: clone(DEFAULTS.collections),
@@ -17,7 +26,7 @@ var Store = (function () {
       calculations: [], demoWinder: 1, demoStairs: 1
     };
     DEFAULTS.calculations.forEach(function (c) { d.calculations.push(seedCalc(c)); });
-    return d;
+    return demoViz(d);
   }
   function seedCalc(c) {
     var t = Date.now() - c.daysAgo * 86400000 - (c.daysAgo ? 3600000 * 2 : 0);
@@ -76,6 +85,7 @@ var Store = (function () {
       // ukázky typů schodišť (d1–d7) přibyly později – doplní se jednou
       if (!db.demoStairs) { db.demoStairs = 1; DEFAULTS.calculations.forEach(function (c) { if (c.demo && !calcById(c.id)) db.calculations.push(seedCalc(c)); }); save(); }
       if (!db.verOrig) { origVersions(); save(); }
+      if (!db.demoViz) { demoViz(db); save(); }
       return db; } } } catch (e) { /* poškozená data */ }
     db = seed(); origVersions(); save();
     return db;

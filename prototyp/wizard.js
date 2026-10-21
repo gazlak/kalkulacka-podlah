@@ -456,7 +456,7 @@
       '</div>' + viewCard(c) + planCard(c);
     html += '<div id="vizCard"></div>';
     if ((c.photos || []).length) html += '<div class="section-title">Fotografie</div>' + photoGrid(c, false);
-    if (f) html += trimCard(c, q);
+    if (f) html += cutCard(c, q) + trimCard(c, q);
     if (f) html += discountCard(c, pr);
     // zakázka
     html += '<div class="section-title">Zakázka</div><div class="list">' + lr('Zakázka', '', '<span style="font-weight:600;white-space:normal">' + esc(c.job.name) + '</span>') +
@@ -545,6 +545,25 @@
     return h;
   }
   // ruční přepis délky lišty a hrany (prázdné = automaticky podle stran schodiště)
+  /* nářezový plán z optimalizace (jen admin): stejné lamely se sloučí, pruh ukáže řezy v měřítku */
+  function cutCard(c, q) {
+    var cp = q && q.cutPlan; if (!cp) return '';
+    var groups = {};
+    cp.plan.forEach(function (l) {
+      var key = l.cuts.map(function (x) { return Math.round(x.len) + '|' + x.desc; }).join(';');
+      (groups[key] = groups[key] || { n: 0, l: l }).n++;
+    });
+    var rows = Object.keys(groups).map(function (k) { return groups[k]; }).sort(function (a, b) { return b.n - a.n; }).map(function (gr) {
+      var bar = gr.l.cuts.map(function (x) {
+        return '<span class="cut' + (/doplňky/.test(x.desc) ? ' rest' : '') + '" style="width:' + (x.len / cp.L * 100) + '%" title="' + esc(Math.round(x.len) + ' mm – ' + x.desc) + '">' + Math.round(x.len / 10) + '</span>';
+      }).join('') + (gr.l.free > 1 ? '<span class="cut waste" style="width:' + (gr.l.free / cp.L * 100) + '%" title="odřezek ' + Math.round(gr.l.free) + ' mm">' + (gr.l.free >= 100 ? Math.round(gr.l.free / 10) : '') + '</span>' : '');
+      return '<div class="cut-row"><b>' + gr.n + '×</b><div class="cut-bar">' + bar + '</div></div>';
+    }).join('');
+    return '<div class="section-title">Nářezový plán</div><div class="card"><p class="small muted">' + cp.lamellas + ' lamel ' + Math.round(cp.L) + ' × ' + Math.round(cp.Wl) + ' mm · využití ' +
+      Math.round(cp.usePct) + ' % · ' + cp.fullStrips + ' plných pruhů, ' + cp.restPieces + ' doplňků ve ' + cp.restStrips + ' společných pruzích · řez ' + cp.kerf + ' mm' +
+      (cp.join ? ' · doplňky smí být nastavené' : '') + '</p><details class="cut-plan"><summary>Zobrazit řezy po lamelách (čísla v cm)</summary>' + rows +
+      '<p class="small muted mt-2"><span class="cut-key"></span> plný pruh <span class="cut-key rest"></span> doplňky vedle sebe <span class="cut-key waste"></span> odřezek</p></details></div>';
+  }
   function trimCard(c, q) {
     if (q.legacy) return '';
     var d = ro(c) ? ' disabled' : '';
@@ -684,7 +703,7 @@
       '<div class="err" id="patErr" role="alert"></div>' + viewCard(c) +
       '<div class="section-title">Zakázka</div>' + stepJob(c, true) +
       '<div class="section-title">Fotografie</div>' + stepPhotos(c, true) + '<div id="vizCard"></div>' +
-      trimCard(c, A.quoteOf(c)) + discountCard(c, pr);
+      cutCard(c, A.quoteOf(c)) + trimCard(c, A.quoteOf(c)) + discountCard(c, pr);
     var rest = '<div class="section-title">Rozpis ceny</div><div id="sums">' + sums(c) + '</div>' + statusCard(c) + A.question('labor') + A.question('laborHours') + (c.number ? A.question('editPrices') : '');
     var bar = '<div class="actionbar stickybar"><div class="inner">' + priceRow() + '<div class="btns">' + backBtn('#/history') + '<button class="btn sq" data-click="moreSheet" aria-label="Další akce">' + ic('more', 'lg') + '</button><button class="btn primary" data-click="saveCalc">Uložit</button></div></div></div>';
     var saved = Store.calcById(c.id) ? (c.number ? 'Změny uloženy ' : 'Koncept uložen ') + A.fmtTime(c.updatedAt) : 'Zatím neuloženo';

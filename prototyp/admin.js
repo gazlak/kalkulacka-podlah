@@ -274,11 +274,11 @@
       '<div class="field" style="margin:0"><label for="rt">Zaokrouhlení</label><select id="rt" name="roundTo"><option value="1"' + (r.roundTo === 1 ? ' selected' : '') + '>na celé Kč</option><option value="10"' + (r.roundTo === 10 ? ' selected' : '') + '>na 10 Kč (ukázka)</option></select></div>' + how('Doprava se připočte jednou za kalkulaci. Sleva se odečte před DPH.') + '</div>' +
       '<div class="section-title">MDF a kurz</div><div class="card"><div class="group-grid">' + field('mdfThickness', 'Tloušťka MDF (mm)', mdf.thicknessMm) + field('mdfEur', 'Cena MDF (EUR/m³)', mdf.eurPerM3, 'Bez DPH.') + '</div>' +
       field('eurRate', 'Kurz (Kč/EUR)', eur.rate, 'Naposledy změněno ' + A.fmtDate(eur.changedAt) + '. Datum se nastaví, když hodnotu změníte.') + A.question('eurRate') +
-      how('MDF Kč/m² = tloušťka (m) × EUR/m³ × kurz = <b>' + nf2(mdfM2) + ' Kč/m²</b>. Plocha MDF = (hloubka + rezerva MDF) × délka + 2 podstupnice, × (1 + rezerva na vstupy).') + '</div>' +
+      how('MDF Kč/m² = tloušťka (m) × EUR/m³ × kurz = <b>' + nf2(mdfM2) + ' Kč/m²</b>. Plocha MDF = (hloubka + rezerva MDF) × délka + 2 podstupnice. Bez další rezervy – ořez je už v rozměrech.') + '</div>' +
       '<div class="section-title">Lepidlo a rezerva</div><div class="card"><div class="group-grid">' + field('glueKg', 'Lepidlo (Kč/kg)', gl.czkPerKg) + field('glueG', 'Nános (g/m²)', gl.gPerM2) + '</div>' +
       how('Lepidlo Kč/m² = Kč/kg × g/m² / 1000 = <b>' + nf2(glueM2) + ' Kč/m²</b> jednoho nánosu. Plocha = plocha vinylu (2× nános: + plocha MDF) × (1 + rezerva).') +
       sel('glueLayers', 'Počet nánosů', [[1, '1× – vinyl na MDF'], [2, '2× – i MDF na podklad']], gl.layers) + A.question('glueLayers') +
-      field('reservePct', 'Rezerva na vstupy (%)', rs.pct, 'Platí pro MDF a lepidlo.') + check('reserveOnVinyl', 'Rezervu počítat i na vinyl', rs.onVinyl) + how('Rezerva na vstupy zvedá MDF a lepidlo, zaškrtnutím i vinyl.') + '</div>' +
+      field('reservePct', 'Rezerva na lepidlo (%)', rs.pct, 'Platí jen pro lepidlo. MDF se počítá z rozměrů dílců, rezerva na ořez je už v nich.') + check('reserveOnVinyl', 'Rezervu počítat i na vinyl (jen paušální režim prořezu)', rs.onVinyl) + how('Rezerva zvedá lepidlo. Na vinyl jen v paušálním režimu – v režimu podle lamel jsou lamely celé i s odřezky.') + '</div>' +
       '<div class="section-title">Práce</div><div class="card">' + field('hourly', 'Hodinová sazba (Kč/h)', lab.hourly, 'Prázdné = nezadáno (kalkulace ukáže upozornění).') + A.question('hourlyRate') +
       '<div class="lbl">Normohodiny na nášlap</div><div class="group-grid">' +
       Calc.TREAD_TYPES.map(function (t) { return field('h_' + t.id, t.label + ' (h)', (lab.hoursByTread || {})[t.id]); }).join('') + '</div>' +
@@ -291,7 +291,9 @@
       how('<b>Nářez vinylu = délka × (hloubka + rezerva).</b> Podstupnice vinyl = délka × výška. MDF podstupnice = 2 × (výška + přídavek). Podlahář rezervu nevidí.') +
       field('vinylInfoPct', 'Vinyl – informativní sleva pro admina (%)', r.vinylInfoPct, 'Jen údaj v rozpisu pro správce, cenu nemění.') + '</div>' +
       '<div class="section-title">Prořez</div><div class="card">' + sel('wasteMode', 'Režim prořezu', [['lamellas', 'Podle lamel (skutečná spotřeba)'], ['pct', 'Paušál v % u dekoru']], r.wasteMode, 'Paušál se nastavuje u vzoru. U kolekce bez rozměru lamely se použije vždy paušál.') + A.question('lamellaJoint') +
-      how(r.wasteMode === 'pct' ? '<b>Spotřeba = plocha k nářezu × (1 + prořez % u vzoru).</b>' : '<b>Spotřeba = celé lamely</b> potřebné na pruhy nášlapu a podstupnice, s odřezky.') + '</div>' +
+      (r.wasteMode === 'pct' ? '' : check('joinRest', 'Doplňkové pruhy smí být nastavené ze dvou kusů', !!r.joinRest) +
+        field('kerfMm', 'Šířka řezu pily (mm)', r.kerfMm == null ? 3 : r.kerfMm, 'Odečte se při každém řezu z lamely.')) +
+      how(r.wasteMode === 'pct' ? '<b>Spotřeba = plocha k nářezu × (1 + prořez % u vzoru).</b>' : '<b>Spotřeba = celé lamely podle nářezového plánu celé kalkulace.</b> Každý nášlap a podstupnice = plné pruhy v šířce lamely + doplňkový pruh. Doplňkové pruhy se skládají vedle sebe do společných pruhů a odřezky se použijí v celé kalkulaci. S nastavováním smí být doplňkový pruh složený z kratších kusů (aspoň 15 cm).') + '</div>' +
       '<div class="section-title">Příplatek za typ nášlapu</div><div class="card"><div class="group-grid">' +
       Calc.TREAD_TYPES.map(function (t) { return field('t_' + t.id, t.label + ' (Kč/nášlap)', (r.treadSurcharge || {})[t.id] || 0); }).join('') + '</div>' + how('<b>Počet nášlapů daného typu × příplatek.</b>') + '</div>' +
       '<button class="btn primary block" type="submit">Uložit sazby</button></form>' +
@@ -319,6 +321,8 @@
     r.cut = { vinyl: { flatMm: num(e.cvFlat), noseMm: num(e.cvNose) }, mdf: { flatMm: num(e.cmFlat), noseMm: num(e.cmNose), riserMm: num(e.cmRiser) } };
     r.vinylInfoPct = num(e.vinylInfoPct);
     r.wasteMode = e.wasteMode.value;
+    if (e.joinRest) r.joinRest = e.joinRest.checked;
+    if (e.kerfMm) { var kf = num(e.kerfMm); if (!(kf >= 0 && kf <= 10)) return A.setErr(e.kerfMm, 'Zadejte 0–10 mm'); r.kerfMm = kf; }
 
     Store.save(); A.toast('Sazby uloženy'); A.dispatch();
   });
