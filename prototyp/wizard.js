@@ -546,8 +546,7 @@
   }
   // ruční přepis délky lišty a hrany (prázdné = automaticky podle stran schodiště)
   /* nářezový plán z optimalizace (jen admin): stejné lamely se sloučí, pruh ukáže řezy v měřítku */
-  function cutCard(c, q) {
-    var cp = q && q.cutPlan; if (!cp) return '';
+  function cutRows(cp) {
     var groups = {};
     cp.plan.forEach(function (l) {
       var key = l.cuts.map(function (x) { return Math.round(x.len) + '|' + x.desc; }).join(';');
@@ -559,10 +558,16 @@
       }).join('') + (gr.l.free > 1 ? '<span class="cut waste" style="width:' + (gr.l.free / cp.L * 100) + '%" title="odřezek ' + Math.round(gr.l.free) + ' mm">' + (gr.l.free >= 100 ? Math.round(gr.l.free / 10) : '') + '</span>' : '');
       return '<div class="cut-row"><b>' + gr.n + '×</b><div class="cut-bar">' + bar + '</div></div>';
     }).join('');
-    return '<div class="section-title">Nářezový plán</div><div class="card"><p class="small muted">' + cp.lamellas + ' lamel ' + Math.round(cp.L) + ' × ' + Math.round(cp.Wl) + ' mm · využití ' +
-      Math.round(cp.usePct) + ' % · ' + cp.fullStrips + ' plných pruhů, ' + cp.restPieces + ' doplňků ve ' + cp.restStrips + ' společných pruzích · řez ' + cp.kerf + ' mm' +
-      (cp.join ? ' · doplňky smí být nastavené' : '') + '</p><details class="cut-plan"><summary>Zobrazit řezy po lamelách (čísla v cm)</summary>' + rows +
-      '<p class="small muted mt-2"><span class="cut-key"></span> plný pruh <span class="cut-key rest"></span> doplňky vedle sebe <span class="cut-key waste"></span> odřezek</p></details></div>';
+    return rows + '<p class="small muted mt-2"><span class="cut-key"></span> plný pruh <span class="cut-key rest"></span> doplňky vedle sebe <span class="cut-key waste"></span> odřezek</p>';
+  }
+  function cutSummary(cp) {
+    return cp.lamellas + ' lamel ' + Math.round(cp.L) + ' × ' + Math.round(cp.Wl) + ' mm · využití ' + Math.round(cp.usePct) + ' % · ' + cp.fullStrips + ' plných pruhů, ' +
+      cp.restPieces + ' doplňků ve ' + cp.restStrips + ' společných pruzích · řez ' + cp.kerf + ' mm' + (cp.join ? ' · doplňky smí být nastavené' : '');
+  }
+  function cutCard(c, q) {
+    var cp = q && q.cutPlan; if (!cp) return '';
+    var rows = cutRows(cp);
+    return '<div class="section-title">Nářezový plán</div><div class="card"><p class="small muted">' + cutSummary(cp) + '</p><details class="cut-plan"><summary>Zobrazit řezy po lamelách (čísla v cm)</summary>' + rows + '</details></div>';
   }
   function trimCard(c, q) {
     if (q.legacy) return '';
@@ -612,7 +617,8 @@
       if (!ro(c)) return '<div class="btn-grid mb no-print"><button class="btn primary" style="grid-column:1/-1" data-click="handover">Odeslat ke zpracování</button>' + edit + dup + '</div>';
       return '<div class="alert info no-print">' + STATUS_INFO[c.status] + '</div><div class="btn-grid mb no-print">' + dup + '</div>';
     }
-    var h = '<div class="btn-grid mb no-print"><button class="btn" data-click="pdf">' + ic('pdf') + 'PDF</button><button class="btn" data-click="mail">' + ic('mail') + 'Odeslat</button>';
+    var h = '<div class="btn-grid mb no-print"><button class="btn" data-click="pdf">' + ic('pdf') + 'PDF</button><button class="btn" data-click="mail">' + ic('mail') + 'Odeslat</button>' +
+      '<button class="btn" data-click="vyroba">' + ic('print') + 'Do výroby</button>';
     if (!inWizard) h += dup;
     return h + '</div>';
   }
@@ -622,7 +628,7 @@
       var inner = '<span class="lead">' + ic(icon) + '<span class="k">' + label + '</span></span>';
       return link ? '<a class="lrow" href="' + link + '">' + inner + '</a>' : '<button type="button" class="lrow" ' + attrs + '>' + inner + '</button>';
     }
-    var rows = row('pdf', 'Stáhnout PDF', 'data-click="pdf"') + row('mail', 'Odeslat e-mailem', 'data-click="mail"');
+    var rows = row('pdf', 'Stáhnout PDF', 'data-click="pdf"') + row('print', 'Objednávka do výroby (PDF)', 'data-click="vyroba"') + row('mail', 'Odeslat e-mailem', 'data-click="mail"');
     rows += row('copy', 'Duplikovat', 'data-click="dup"') + row('compare', 'Porovnat vzory', '', '#/compare/' + c.id);
     if (c.versions && c.versions.length) rows += row('history', 'Historie verzí', 'data-click="versions"');
     if (priceChanged(c)) rows += row('refresh', 'Přepočítat podle aktuálního ceníku', 'data-click="recalc"');
@@ -774,6 +780,59 @@
     A.render(sheet, { title: 'Náhled PDF', back: '#/calc/' + c.id, bar: '<div class="actionbar stickybar no-print"><div class="inner"><div class="btns">' + backBtn('#/calc/' + c.id) + '<button class="btn primary" data-click="print">' + ic('print') + 'Tisk / Uložit jako PDF</button></div></div></div>' });
   });
   A.on('click', 'print', function () { window.print(); });
+
+  /* ---------- objednávka do výroby: rozměry dílců, materiál, nářezový plán, fotky; bez cen ---------- */
+  A.on('click', 'vyroba', function () { var c = W.c; if (!full()) return A.toast('Jen pro správce'); if (!allValid(c)) return A.toast('Nejprve dokončete kalkulaci'); ensureSaved(c); A.closeModal && A.closeModal(); A.go('/calc/' + c.id + '/vyroba'); });
+  A.route('/calc/:id/vyroba', 'user', function (p, user) {
+    var c = loadCalc(p.id, user); if (!c) return;
+    if (!full()) { A.toast('Jen pro správce'); return A.go('/calc/' + c.id); }
+    if (!allValid(c)) return A.go('/wizard/' + c.id + '/1');
+    W.c = c;
+    var pr = A.pricingOf(c), pat = Calc.findPattern(pr, c.patternId), q = A.quoteOf(c), owner = Store.userById(c.ownerId).profile, r = pr.rates;
+    var n0 = function (x) { var v = parseFloat(String(x == null ? '' : x).replace(',', '.')); return isNaN(v) ? 0 : v; };
+    var coll = Calc.collectionOf(pr, pat, c.formatId), cp = q.cutPlan, mm = function (cm) { return Math.round(n0(cm) * 10); };
+    var steps = c.groups.reduce(function (a, g) { return a + n0(g.count); }, 0), glue = q.lines.filter(function (l) { return l.key === 'glue'; })[0];
+    var parts = c.groups.map(function (g, i) {
+      var inf = q.groupsInfo[i] || {}, d = inf.cut || inf.dims || {}, n = n0(g.count);
+      return '<tr><td class="num"><b>' + n + '×</b></td><td>' + esc(Calc.stepKind(g).label) + (Calc.isLanding && Calc.isLanding(g) ? ', podesta' : '') + '<br><span class="small muted">' +
+        esc(Calc.treadType(g).label.toLowerCase()) + ' · ' + esc(sideLabel(g, c)) + '</span></td>' +
+        '<td class="num">' + mm(n0(g.width)) + ' × ' + mm(n0(g.depth)) + (g.coverRiser ? '<br><span class="small muted">podst. ' + mm(n0(g.riserHeight)) + '</span>' : '') + '</td>' +
+        '<td class="num"><b>' + mm(d.w) + ' × ' + mm(d.d || d.dVinyl) + '</b>' + (d.r ? '<br>' + mm(d.w) + ' × ' + mm(d.r) : '') + '</td>' +
+        '<td class="num">' + mm(d.w) + ' × ' + mm(d.dMdf) + (d.rMdfOne ? '<br>2× ' + mm(d.w) + ' × ' + mm(d.rMdfOne) : d.rMdf ? '<br>' + mm(d.w) + ' × ' + mm(d.rMdf) : '') + '</td></tr>';
+    }).join('');
+    function mrow(k, v, sub) { return '<tr><td>' + k + (sub ? '<br><span class="small muted">' + sub + '</span>' : '') + '</td><td class="num"><b>' + v + '</b></td></tr>'; }
+    var mat = mrow('Vinyl – ' + esc(pat.name), (q.lamellas ? q.lamellas + ' lamel · ' : '') + m2(q.lines[0] && q.lines[0].key === 'material' ? q.lines[0].qty : q.prodArea),
+        coll && coll.lamellaLengthMm ? 'lamela ' + Math.round(coll.lamellaLengthMm) + ' × ' + Math.round(coll.lamellaWidthMm) + ' mm · plocha k nářezu ' + m2(q.prodArea) : 'plocha k nářezu ' + m2(q.prodArea)) +
+      mrow('MDF ' + (r.mdf && r.mdf.thicknessMm ? r.mdf.thicknessMm + ' mm' : ''), m2(q.mdfArea), 'z rozměrů dílců vč. rezervy na ořez') +
+      (glue ? mrow('Lepidlo', m2(glue.qty), glue.sub) : '') +
+      (q.trim && q.trim.bm ? mrow('Lišta KPV50', nf.format(q.trim.bm) + ' bm', 'strana u zdi') : '') +
+      (q.edge && q.edge.bm ? mrow('Vinylová hrana', nf.format(q.edge.bm) + ' bm', 'otevřená strana') : '');
+    var photos = (c.photos || []).slice(0, 6);
+    var sheet = '<div class="pdf-wrap"><div class="pdf-sheet prod-sheet">' +
+      '<div class="pdf-top"><div><div class="prod-kicker">Objednávka do výroby</div><h1>Zakázka ' + esc(c.number || '(koncept)') + '</h1><div>Vystaveno: ' + A.fmtDate(Date.now()) + '</div></div>' +
+      '<div class="right">' + (owner.logo ? '<img class="logo" src="' + owner.logo + '" alt="Logo"><br>' : '') + '<b>' + esc(owner.company || owner.name) + '</b><br><span class="small">' +
+      [owner.name, owner.ico ? 'IČO ' + owner.ico : '', owner.phone].filter(Boolean).map(esc).join('<br>') + '</span></div></div><hr>' +
+      (c.number ? '' : '<div class="alert warn">Kalkulace je zatím koncept – před výrobou ji uložte.</div>') +
+      '<dl class="pdf-meta"><dt>Zakázka</dt><dd>' + esc(c.job.name) + '</dd><dt>Zákazník</dt><dd>' + esc(c.job.customer || '—') + '</dd>' +
+      (c.job.address ? '<dt>Místo montáže</dt><dd>' + esc(c.job.address) + '</dd>' : '') +
+      '<dt>Schodiště</dt><dd>' + esc(Calc.stairType(c).label) + ' · ' + steps + ' ' + (steps === 1 ? 'schod' : steps < 5 ? 'schody' : 'schodů') + '</dd>' +
+      '<dt>Požadovaný termín</dt><dd class="fill">&nbsp;</dd></dl>' +
+      '<div class="pat-line"><img src="' + A.patternImg(pat) + '" alt=""><div><b>' + esc(pat.name) + '</b><br><span class="small">' + esc(pat.kolekce || '') +
+      (coll && coll.lamellaLengthMm ? ' · lamela ' + Math.round(coll.lamellaLengthMm) + ' × ' + Math.round(coll.lamellaWidthMm) + ' mm' : '') + '</span></div></div>' +
+      '<h3>Dílce</h3><p class="small muted">Rozměry v mm. Nářez = naměřený rozměr + rezerva na ořez (vinyl ' + (r.cut && r.cut.vinyl ? r.cut.vinyl.flatMm + '/' + r.cut.vinyl.noseMm : '–') +
+      ' mm bez/s nosem, MDF ' + (r.cut && r.cut.mdf ? r.cut.mdf.flatMm + '/' + r.cut.mdf.noseMm : '–') + ' mm). První řádek nášlap, druhý podstupnice.</p>' +
+      '<table class="tbl"><thead><tr><th class="num">Ks</th><th>Schod</th><th class="num">Naměřeno<br>délka × hloubka</th><th class="num">Nářez vinyl</th><th class="num">Nářez MDF</th></tr></thead><tbody>' + parts + '</tbody></table>' +
+      (q.needsJoint ? '<p class="small">' + JOINT + ' Šířka schodu je větší než délka lamely – pruhy se nastavují.</p>' : '') +
+      '<h3>Materiál</h3><table class="tbl"><tbody>' + mat + '</tbody></table>' +
+      (cp ? '<h3>Nářezový plán vinylu</h3><p class="small muted">' + cutSummary(cp) + '. Čísla v cm.</p><div class="prod-cut">' + cutRows(cp) + '</div>' : '') +
+      (photos.length ? '<h3>Fotografie</h3><div class="prod-photos">' + photos.map(function (ph) { return '<img src="' + ph + '" alt="">'; }).join('') + '</div>' : '') +
+      Viz.pdf(c) +
+      '<h3>Poznámka</h3><div class="prod-note">' + (c.job.note ? esc(c.job.note) : '&nbsp;') + '</div>' +
+      '<div class="prod-sign"><div>Objednal (podlahář)<span></span></div><div>Převzal (výroba)<span></span></div><div>Datum<span></span></div></div>' +
+      '<div class="pdf-foot">Vygenerováno v prototypu. Výrobní list neobsahuje ceny. V ostré verzi PDF vytváří server.</div></div></div>';
+    A.render(sheet, { title: 'Objednávka do výroby', back: '#/calc/' + c.id, bar: '<div class="actionbar stickybar no-print"><div class="inner"><div class="btns">' + backBtn('#/calc/' + c.id) +
+      '<button class="btn primary" data-click="print">' + ic('print') + 'Tisk / Uložit jako PDF</button></div></div></div>' });
+  });
 
   /* ---------- porovnání vzorů ---------- */
   A.route('/compare/:id', 'user', function (p, user) {
