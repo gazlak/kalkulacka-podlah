@@ -18,7 +18,7 @@ var Plan = (function () {
     groups.forEach(function (g, gi) {
       var w = n0(g.width), dl = n0(g.depth), dr = Calc.isSkewed(g) ? n0(g.depthRight) : dl, n = Math.min(100, Math.floor(n0(g.count)));
       if (!(w > 0 && dl > 0 && dr > 0 && n > 0)) return;
-      for (var k = 0; k < n; k++) steps.push({ g: gi, w: w, dl: dl, dr: dr, rh: n0(g.riserHeight) > 0 ? n0(g.riserHeight) : 17, cover: !!g.coverRiser, landing: Calc.isLanding(g), nose: Calc.hasNose(g), first: k === 0 });
+      for (var k = 0; k < n; k++) steps.push({ g: gi, w: w, dl: dl, dr: dr, rh: n0(g.riserHeight) > 0 ? n0(g.riserHeight) : 17, cover: !!g.coverRiser, nose: Calc.hasNose(g), first: k === 0 });
     });
     return steps;
   }
@@ -70,7 +70,7 @@ var Plan = (function () {
     }
   }
 
-  /* vrací {steps: [{pts, poly, back, g, landing, nose, first, noseLine, c}], turnDeg}; souřadnice v cm, y roste nahoru.
+  /* vrací {steps: [{pts, poly, back, g, nose, first, noseLine, c}], turnDeg}; souřadnice v cm, y roste nahoru.
    * pts = [levý přední, pravý přední, pravý zadní, levý zadní], poly = celý obrys (u rohového schodu má bod navíc),
    * back = index hrany obrysu, která je zadní hranou schodu. */
   function layout(groups, stairType, side) {
@@ -91,31 +91,17 @@ var Plan = (function () {
     steps.forEach(function (s) {
       var u = st.u, r = right(u), L, R, L2, R2;
       L = st.mode === 'center' ? add(st.p, r, -s.w / 2) : st.mode === 'left' ? st.p : add(st.p, r, -s.w);
-      if (s.landing && s.dl === s.dr && perLanding) {
-        // podesta s otočením: vnější hrana lícuje s ramenem, které na ni přichází
-        if (prev && st.mode === 'center') L = ld < 0 ? prev.L : add(prev.R, r, -s.w);
-        R = add(L, r, s.w); L2 = add(L, u, s.dl); R2 = add(R, u, s.dl);
-        if (perLanding === 90) st = ld < 0 ? { mode: 'left', p: R2, u: r } : { mode: 'right', p: L2, u: [-r[0], -r[1]] };
-        else st = ld < 0 ? { mode: 'left', p: R, u: [-u[0], -u[1]] } : { mode: 'right', p: L, u: [-u[0], -u[1]] };
-        // čára výstupu jde po podestě ve stejné vzdálenosti od hrany, ne přes její střed
-        if (prev) {
-          var wIn = Math.hypot(prev.R[0] - prev.L[0], prev.R[1] - prev.L[1]), a = add(mid(prev.L, prev.R), u, s.dl / 2);
-          s.way = perLanding === 180 ? [a, add(add(ld < 0 ? R : L, r, ld * wIn / 2), u, s.dl / 2)] : [a];
-        }
-        prev = null; turn += perLanding * ld; s.sk = 0;
-      } else {
-        R = add(L, r, s.w); L2 = add(L, u, s.dl); R2 = add(R, u, s.dr);
-        var len = Math.hypot(R2[0] - L2[0], R2[1] - L2[1]), r2 = [(R2[0] - L2[0]) / len, (R2[1] - L2[1]) / len];
-        // za šikmým schodem navazuje další na vnitřní (kratší) straně, ať se zatáčka nerozjíždí
-        var u2 = [-r2[1], r2[0]];
-        st = s.dl === s.dr ? { mode: 'center', p: mid(L2, R2), u: u2 } : s.dl < s.dr ? { mode: 'left', p: L2, u: u2 } : { mode: 'right', p: R2, u: u2 };
-        prev = { L: L2, R: R2 }; turn += Math.atan2(s.dr - s.dl, s.w) * DEG;
-        s.sk = s.dl === s.dr ? 0 : s.dl < s.dr ? 1 : -1;
-      }
+      R = add(L, r, s.w); L2 = add(L, u, s.dl); R2 = add(R, u, s.dr);
+      var len = Math.hypot(R2[0] - L2[0], R2[1] - L2[1]), r2 = [(R2[0] - L2[0]) / len, (R2[1] - L2[1]) / len];
+      // za šikmým schodem navazuje další na vnitřní (kratší) straně, ať se zatáčka nerozjíždí
+      var u2 = [-r2[1], r2[0]];
+      st = s.dl === s.dr ? { mode: 'center', p: mid(L2, R2), u: u2 } : s.dl < s.dr ? { mode: 'left', p: L2, u: u2 } : { mode: 'right', p: R2, u: u2 };
+      turn += Math.atan2(s.dr - s.dl, s.w) * DEG;
+      s.sk = s.dl === s.dr ? 0 : s.dl < s.dr ? 1 : -1;
       s.pts = [L, R, R2, L2]; s.u = u;
       // střed podle zadané šířky – tudy vede čára výstupu, i když se vnější hrana protáhne ke stěně
       s.c = mid(mid(L, R), mid(L2, R2));
-      if (!s.way) s.way = [s.c];
+      s.way = [s.c];
     });
     walls(steps);
     steps.forEach(function (s) {
@@ -137,7 +123,7 @@ var Plan = (function () {
     function pt(p) { return (pad + (p[0] - minX) * k).toFixed(1) + ',' + (pad + (maxY - p[1]) * k).toFixed(1); }
     var out = '<svg viewBox="0 0 ' + W.toFixed(0) + ' ' + H.toFixed(0) + '" width="' + W.toFixed(0) + '" height="' + H.toFixed(0) + '" role="img" aria-label="Půdorys schodiště, pohled shora">';
     steps.forEach(function (s) {
-      out += '<polygon class="pg pg' + (s.g % 4) + (s.landing ? ' pl' : '') + '" points="' + s.poly.map(pt).join(' ') + '"/>';
+      out += '<polygon class="pg pg' + (s.g % 4) + '" points="' + s.poly.map(pt).join(' ') + '"/>';
       if (s.noseLine) out += '<polyline class="nose" points="' + s.noseLine.map(pt).join(' ') + '"/>';
     });
     // směr výstupu: čára středy schodů, dole tečka, nahoře šipka

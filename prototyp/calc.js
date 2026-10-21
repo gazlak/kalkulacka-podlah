@@ -1,7 +1,11 @@
 /* Čisté výpočetní funkce (bez DOM). Dvě cesty: starý snapshot bez `collections` počítá `legacyQuote` (vzorce níže),
  * nový ceník (kolekce, lamely, normohodiny) jde přes `newQuote`. Vzorce staré cesty podle zadání:
  *   A = š · (h + v · p) / 10 000 · n
- *   U šikmého schodu (jiná hloubka vlevo a vpravo) je h průměr obou hloubek – plocha lichoběžníku.
+ *   U šikmého schodu (jiná hloubka vlevo a vpravo) je h průměr obou hloubek – plocha lichoběžníku (jen staré uložené kalkulace).
+ * Model nářezu (ceník s `rates.cut`): dílec je obdélník z desky; L = největší délka, H = hloubka kolmo na ni, R = výška podstupnice.
+ *   nášlap L × (H + rezerva), rezerva zvlášť pro vinyl a MDF (výchozí 136 mm bez nosu, 126 mm s nosem); podstupnice vinyl L × R (bez přídavku), MDF 2 × L × (R + přídavek) (dva kusy),
+ *   přídavek podstupnice jen u MDF (výchozí 50 mm). Rezerva je v ceně, podlahář ji nevidí. `vinylInfo` (vinyl −50 %) je jen informace pro admina, mimo cenu.
+ *   Starší model s `rates.cutMargin` (m = přídavek v cm na každou stranu): nášlap (L + 2m) × (H + 2m [+ nos]), podstupnice (L + 2m) × (R + 2m).
  *   C = ΣA · (1 + r) · c_m + Σn · (c_n + p · c_p) + c_d
  *   K tomu podle typu nášlapu (nastavuje správce): podklad MDF, lepidlo a práce za m² plochy skupiny a příplatek za nášlap.
  *   MDF za m² = tloušťka v mm / 1000 · cena za m³ v EUR · kurz.
@@ -26,14 +30,15 @@ var Calc = (function () {
     { id: 'right90', label: 'Pravotočivé 90° (do L)', turn: -90 }, { id: 'left90', label: 'Levotočivé 90° (do L)', turn: 90 },
     { id: 'right', label: 'Pravotočivé 180° (do U)', turn: -180 }, { id: 'left', label: 'Levotočivé 180° (do U)', turn: 180 }
   ];
-  var TREAD_TYPES = [
-    { id: 'nose', label: 'S nosem', nose: true }, { id: 'flat', label: 'Bez nosu' },
-    { id: 'landingNose', label: 'Podestový s nosem', nose: true, landing: true }, { id: 'landingFlat', label: 'Podestový bez nosu', landing: true }
-  ];
+  var TREAD_TYPES = [{ id: 'nose', label: 'S nosem', nose: true }, { id: 'flat', label: 'Bez nosu' }];
+  // typ schodu (skupina): zatím jen informativní, cenu nemění
+  var STEP_KINDS = [{ id: 'straight', label: 'Rovný' }, { id: 'skew', label: 'Šikmý / rohový' }];
+  // podestové typy zrušeny; staré uložené id se převede na běžné
+  var OLD_TREAD = { landingNose: 'nose', landingFlat: 'flat' };
   function pick(list, id) { for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i]; return list[0]; }
   function stairType(c) { return pick(STAIR_TYPES, c.stairType); }
-  function treadType(g) { return pick(TREAD_TYPES, g.treadType); }
-  function isLanding(g) { return !!treadType(g).landing; }
+  function treadType(g) { return pick(TREAD_TYPES, OLD_TREAD[g.treadType] || g.treadType); }
+  function stepKind(g) { return pick(STEP_KINDS, g.stepKind === 'corner' ? 'skew' : g.stepKind); }
   function hasNose(g) { return !!treadType(g).nose; }
 
   // plocha jedné skupiny v m²; š=šířka, h=hloubka nášlapu, v=výška podstupnice, p=obkládat podstupnici, n=počet
@@ -145,7 +150,13 @@ var Calc = (function () {
 
   function defaults(rates) {
     var a = rates.allowance || {}, nz = rates.nose || {}, l = rates.labor || {}, h = l.hoursByTread || {}, g = rates.glue || {}, m = rates.mdf || {}, e = rates.eur || {}, rs = rates.reserve || {};
+    var ct = rates.cut;
+    // starší plochý tvar {flatMm, noseMm, mdfRiserMm} platí pro vinyl i MDF, přídavek podstupnice jen u MDF
+    function cutPart(x, riser) { x = x || {}; return { flat: n0(x.flatMm), nose: n0(x.noseMm), riser: n0(riser !== undefined ? riser : x.riserMm) }; }
     return {
+      cut: ct ? (ct.vinyl || ct.mdf ? { vinyl: cutPart(ct.vinyl, 0), mdf: cutPart(ct.mdf) } : { vinyl: cutPart(ct, 0), mdf: cutPart(ct, ct.mdfRiserMm) }) : null,
+      vinylInfoPct: isNaN(num(rates.vinylInfoPct)) ? 50 : num(rates.vinylInfoPct),
+      cutMargin: isNaN(num(rates.cutMargin)) ? null : num(rates.cutMargin),
       allowance: { width: n0(a.width), depth: n0(a.depth), riser: n0(a.riser) },
       nose: { mdf: n0(nz.mdfOverhangMm) + n0(nz.mdfWrapMm), vinyl: n0(nz.vinylOverhangMm) + n0(nz.vinylWrapMm) },
       hourly: isNaN(num(l.hourly)) ? null : num(l.hourly),
@@ -159,7 +170,17 @@ var Calc = (function () {
   }
   // rozměry jednoho dílce v cm: šířka, hloubka pro MDF a pro vinyl, podstupnice, největší hloubka (šikmý schod)
   function pieceDims(g, rates) {
-    var d = defaults(rates), nose = hasNose(g), base = depthOf(g) + d.allowance.depth;
+    var d = defaults(rates), nose = hasNose(g);
+    if (d.cut) {
+      var hc = isSkewed(g) ? Math.max(n0(g.depth), n0(g.depthRight)) : n0(g.depth), cv = d.cut.vinyl, cm = d.cut.mdf, rv = n0(g.riserHeight);
+      var addV = nose ? cv.nose : cv.flat, addM = nose ? cm.nose : cm.flat, dv = hc + addV / 10;
+      return { w: n0(g.width), dMdf: hc + addM / 10, dVinyl: dv, r: g.coverRiser ? rv : 0, rMdf: g.coverRiser ? 2 * (rv + cm.riser / 10) : 0, rMdfOne: rv + cm.riser / 10, dMax: dv, add: addV, addMdf: addM, addRiserMdf: cm.riser };
+    }
+    if (d.cutMargin !== null) {
+      var m2x = 2 * d.cutMargin, hh = isSkewed(g) ? Math.max(n0(g.depth), n0(g.depthRight)) : n0(g.depth), dv = hh + m2x + (nose ? d.nose.vinyl / 10 : 0);
+      return { w: n0(g.width) + m2x, dMdf: hh + m2x + (nose ? d.nose.mdf / 10 : 0), dVinyl: dv, r: g.coverRiser ? n0(g.riserHeight) + m2x : 0, rMdf: g.coverRiser ? n0(g.riserHeight) + m2x : 0, dMax: dv };
+    }
+    var base = depthOf(g) + d.allowance.depth;
     var maxD = isSkewed(g) ? Math.max(n0(g.depth), n0(g.depthRight)) + d.allowance.depth : base;
     var vNose = nose ? d.nose.vinyl / 10 : 0;
     return {
@@ -167,6 +188,7 @@ var Calc = (function () {
       dMdf: base + (nose ? d.nose.mdf / 10 : 0),
       dVinyl: base + vNose,
       r: g.coverRiser ? n0(g.riserHeight) + d.allowance.riser : 0,
+      rMdf: g.coverRiser ? n0(g.riserHeight) + d.allowance.riser : 0,
       dMax: maxD + vNose
     };
   }
@@ -204,13 +226,14 @@ var Calc = (function () {
     var treads = 0, riserTreads = 0, hours = 0, riserCount = 0, surchargeRaw = 0, needsJoint = false, sur = rates.treadSurcharge || {};
     groups.forEach(function (g) {
       var n = n0(g.count), dm = pieceDims(g, rates), a = groupArea(g);
-      var prod = dm.w * (dm.dVinyl + dm.r) / 1e4 * n, mdf = dm.w * (dm.dMdf + dm.r) / 1e4 * n, lam = lamellaUse(g, dm, coll), use;
+      var cutNew = !!d.cut || d.cutMargin !== null;
+      var prod = dm.w * (dm.dVinyl + dm.r) / 1e4 * n, mdf = dm.w * (dm.dMdf + dm.rMdf) / 1e4 * n, lam = lamellaUse(g, dm, coll), use;
       if (lam && !usePct) { use = lam.area; anyLamella = true; } else use = prod * (1 + wastePctPat / 100);
       areas.push(a); totalArea += a; prodArea += prod; mdfArea += mdf; consumption += use;
       if (lam) lamellas += lam.lamellas;
       if (lam && lam.needsJoint) needsJoint = true;
       info.push({ measured: a, prod: prod, mdf: mdf, consumption: use, lamellas: lam ? lam.lamellas : null, strips: lam ? lam.strips : null,
-        needsJoint: !!(lam && lam.needsJoint), dims: dm, wastePct: prod > 0 ? (use / prod - 1) * 100 : 0 });
+        needsJoint: !!(lam && lam.needsJoint), dims: dm, cut: cutNew ? { w: dm.w, d: dm.dVinyl, dMdf: dm.dMdf, r: dm.r, rMdf: dm.rMdf, rMdfOne: dm.rMdfOne, add: dm.add || 0, addMdf: dm.addMdf || 0, addRiser: dm.addRiser || 0, addRiserMdf: dm.addRiserMdf || 0, n: n } : null, wastePct: prod > 0 ? (use / prod - 1) * 100 : 0 });
       treads += n; if (g.coverRiser) { riserTreads += n; riserCount += n; }
       var tt = treadType(g).id; hours += n * n0((d.hours || {})[tt]); surchargeRaw += n * n0(sur[tt]);
     });
@@ -255,6 +278,7 @@ var Calc = (function () {
       autoTrimBm: runs.trimBm, autoEdgeBm: runs.edgeBm,
       treads: treads, riserTreads: riserTreads, wastePct: wastePct,
       material: material, labor: labor, mdf: mdf, glue: glue, laborM2: 0, risers: risers, treadTypes: treadTypes, transport: transport, extras: extrasTotal,
+      vinylInfo: { pct: d.vinylInfoPct, amount: roundTo(material * (1 - d.vinylInfoPct / 100), step) },
       subtotal: subtotal, discountAmount: discountAmount, base: base, vat: vat, total: base + vat
     };
   }
@@ -279,7 +303,7 @@ var Calc = (function () {
   // validace polí skupiny; vrací {field: 'chyba'} (prázdný objekt = OK)
   function validateGroup(g) {
     var e = {};
-    var fields = [['width', 'Šířka'], ['depth', isSkewed(g) ? 'Hloubka vlevo' : 'Hloubka nášlapu'], ['riserHeight', 'Výška podstupnice']];
+    var fields = [['width', 'Největší délka'], ['depth', 'Hloubka'], ['riserHeight', 'Výška podstupnice']];
     if (isSkewed(g)) fields.push(['depthRight', 'Hloubka vpravo']);
     fields.forEach(function (f) {
       var v = num(g[f[0]]);
@@ -298,7 +322,7 @@ var Calc = (function () {
     comparePatterns: comparePatterns, computeExtras: computeExtras, formatCZK: formatCZK, formatM2: formatM2,
     validateGroup: validateGroup, findPattern: findPattern, isSkewed: isSkewed, depthOf: depthOf, depthLabel: depthLabel,
     isLegacy: isLegacy, collectionOf: collectionOf, patternPrice: patternPrice, patternOffered: patternOffered, pieceDims: pieceDims, lamellaUse: lamellaUse, sideRuns: sideRuns, defaults: defaults,
-    STAIR_TYPES: STAIR_TYPES, TREAD_TYPES: TREAD_TYPES, stairType: stairType, treadType: treadType, isLanding: isLanding, hasNose: hasNose, m2Rates: m2Rates
+    STAIR_TYPES: STAIR_TYPES, TREAD_TYPES: TREAD_TYPES, stairType: stairType, treadType: treadType, STEP_KINDS: STEP_KINDS, stepKind: stepKind, hasNose: hasNose, m2Rates: m2Rates
   };
 })();
 if (typeof module !== 'undefined') module.exports = Calc;

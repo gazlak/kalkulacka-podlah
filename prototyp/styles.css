@@ -234,9 +234,9 @@ input[type=file] { width: 100%; min-height: var(--h-btn-sm); padding: var(--s-2)
 .stepper-num.invalid { border-color: var(--bad); }
 
 /* segmented control */
-.seg { display: inline-flex; background: var(--surface-2); border-radius: var(--r-md); padding: 3px; gap: 2px; max-width: 100%; }
+.seg { display: inline-flex; background: var(--surface-2); border-radius: var(--r-md); padding: 4px; gap: 4px; max-width: 100%; box-shadow: inset 0 0 0 1px var(--line); }
 .seg.full { display: flex; }
-.seg > button, .seg > a { flex: 1; border: 0; background: none; min-height: var(--h-btn-sm); padding: 0 var(--s-4); border-radius: calc(var(--r-md) - 2px); font: inherit; font-size: var(--fs-sm); font-weight: 600; color: var(--muted); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; white-space: nowrap; transition: background .15s, color .15s; }
+.seg > button, .seg > a { flex: 1; border: 0; background: none; min-height: var(--h-btn-sm); padding: 0 var(--s-4); border-radius: calc(var(--r-md) - 4px); font: inherit; font-size: var(--fs-sm); font-weight: 600; color: var(--muted); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; white-space: nowrap; transition: background .15s, color .15s; }
 .seg > .on { background: var(--surface); color: var(--text); box-shadow: var(--shadow-1); }
 .seg > button[disabled] { opacity: .5; cursor: not-allowed; }
 
@@ -262,18 +262,22 @@ body.present .qrow, body.present .qchip, body.present [data-qonly] { display: no
 .st-přijato { background: var(--ok-soft); color: var(--ok); }
 .st-zamítnuto { background: var(--bad-soft); color: var(--bad); }
 .st-aktivní { background: var(--ok-soft); color: var(--ok); }
-.st-pozván { background: var(--warn-soft); color: var(--warn); }
+.st-pozván, .st-předáno { background: var(--warn-soft); color: var(--warn); }
 .st-blokován { background: var(--bad-soft); color: var(--bad); }
 .st-neověřen { background: var(--warn-soft); color: var(--warn); }
 .dot { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); font-weight: 600; }
 .dot::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
-.dot.st-koncept, .dot.st-odesláno, .dot.st-přijato, .dot.st-zamítnuto { background: none; }
+.dot.st-koncept, .dot.st-předáno, .dot.st-odesláno, .dot.st-přijato, .dot.st-zamítnuto { background: none; }
 
 /* alerty */
 .alert { padding: var(--s-3) var(--s-4); border-radius: var(--r-md); margin-bottom: var(--s-4); font-size: var(--fs-sm); line-height: 1.45; }
 .alert.err { background: var(--bad-soft); color: var(--bad); margin-top: 0; font-size: var(--fs-sm); }
 .alert.err::before { display: none; }
 .alert.warn { background: var(--warn-soft); color: var(--warn); }
+.calc-how { display: flex; align-items: flex-start; gap: var(--s-2); margin: var(--s-3) 0 var(--s-4); padding: var(--s-3); border-radius: var(--r-md); background: var(--info-soft); color: var(--text); font-size: 13px; line-height: 1.45; }
+.calc-how:last-child { margin-bottom: 0; }
+.calc-how .ic { color: var(--info); margin-top: 2px; }
+.calc-how b { font-weight: 700; }
 .alert.info { background: var(--info-soft); color: var(--info); }
 .alert.ok { background: var(--ok-soft); color: var(--ok); }
 .alert .btn { margin-top: var(--s-3); }
@@ -299,6 +303,10 @@ body.present .qrow, body.present .qchip, body.present [data-qonly] { display: no
 .depth-row { margin-top: var(--s-3); }
 .keep-hidden { visibility: hidden; }
 .group-grid .span2 { grid-column: span 2; }
+/* pole v mřížce sdílí řádky, takže inputy sedí v jedné řadě i při zalomeném popisku nebo nápovědě */
+.group-grid { grid-auto-rows: auto; }
+.group-grid > .field { display: grid; grid-template-rows: subgrid; grid-row: span 4; align-content: start; }
+.group-grid > .field > label, .group-grid > .field > .lbl { align-self: end; }
 /* půdorys schodiště */
 .plan { text-align: center; }
 .plan svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }
@@ -509,7 +517,7 @@ body.has-bar #toast { bottom: calc(160px + var(--safe-b)); }
   .only-desktop { display: block; }
   table.only-desktop { display: table; }
   .only-mobile { display: none; }
-  .group-grid, .depth-row { grid-template-columns: repeat(4, 1fr); }
+  .group-grid, .depth-row { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
   .pdf-sheet { padding: var(--s-8) 48px; }
   .pdf-wrap { padding: var(--s-6) var(--s-4); }
   dialog { width: 520px; max-width: calc(100vw - 32px); margin: auto; border-radius: 20px; }
@@ -585,3 +593,33 @@ html { scroll-padding-top: 72px; scroll-padding-bottom: 180px; }
 .pdf-sheet .pdf-viz { margin: var(--s-4) 0; break-inside: avoid; }
 .pdf-sheet .pdf-viz h3 { font-size: 1rem; margin-bottom: 6px; }
 .pdf-sheet .pdf-viz img { width: 100%; max-height: 520px; object-fit: contain; border-radius: 6px; }
+/* fotografie */
+.btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-2); margin-bottom: var(--s-3); }
+.photo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-2); }
+.photo-grid .ph { position: relative; }
+.photo-grid .zoom { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
+.photo-grid img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--r-lg); }
+.photo-grid .del { position: absolute; top: 0; right: 0; min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; border: 0; background: none; color: #fff; cursor: pointer; filter: drop-shadow(0 0 3px rgba(0,0,0,.7)); }
+.photo-big { display: block; max-width: 100%; max-height: 70vh; margin: 0 auto; border-radius: var(--r-lg); }
+@media (min-width: 720px) { .photo-grid { grid-template-columns: repeat(4, 1fr); } }
+
+/* admin: úprava kalkulace na jedné stránce */
+.adm-grid { display: grid; gap: 16px; }
+.adm-side { display: contents; }
+.adm-top { order: -1; }
+.adm-rest { order: 1; }
+@media (min-width: 900px) {
+  .adm-grid { grid-template-columns: minmax(0, 1fr) 380px; align-items: start; }
+  .adm-side { display: block; position: sticky; top: 72px; max-height: calc(100vh - 150px); overflow-y: auto; }
+  .adm-top, .adm-rest { order: 0; }
+}
+/* rozměry schodu: délka, hloubka a výška vždy v jedné řadě */
+.group-card .group-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 var(--s-2); }
+.group-card .group-grid .inline-unit input { padding-right: 32px; padding-left: var(--s-2); }
+.group-card .group-grid .inline-unit > span { right: var(--s-2); }
+/* čtyři volby se na mobilu skládají do 2 × 2, ať stránka neposkakuje do strany */
+@media (max-width: 600px) { .seg.full.wrap { display: grid; grid-template-columns: 1fr 1fr; } .seg.wrap > button { padding: 0 var(--s-2); } }
+/* filtr stavů v Historii: dotykový cíl 44 px */
+.chips .chip { height: var(--h-btn-sm); }
+
+.dim-hint { margin: 0 0 var(--s-4); }
