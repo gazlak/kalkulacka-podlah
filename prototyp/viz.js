@@ -43,8 +43,9 @@ var Viz = (function () {
       if (mode === 'cmp') stage = '<img src="' + esc(v.original) + '" alt="Původní fotka">' +
         '<div class="viz-after" style="clip-path:inset(0 0 0 ' + cut + '%)"><img src="' + esc(v.url) + '" alt="Vizualizace schodů ' + (i + 1) + '"></div>' +
         '<span class="viz-line" style="left:' + cut + '%"></span><span class="viz-tag l">Před</span><span class="viz-tag r">Po</span>' +
-        '<input type="range" class="viz-range" min="0" max="100" value="' + cut + '" aria-label="Porovnání před a po" data-input="vizSlide" data-i="' + i + '">';
-      else stage = '<button type="button" class="viz-zoom" data-click="vizZoom" data-i="' + i + '" aria-label="Zvětšit"><img src="' + esc(mode === 'pred' ? v.original : v.url) + '" alt="' +
+        '<input type="range" class="viz-range" min="0" max="100" value="' + cut + '" aria-label="Porovnání před a po" data-input="vizSlide" data-i="' + i + '">' +
+        '<button type="button" class="viz-full" data-click="vizZoom" data-i="' + i + '" data-k="cmp" aria-label="Přes celou obrazovku">⤢</button>';
+      else stage = '<button type="button" class="viz-zoom" data-click="vizZoom" data-i="' + i + '" aria-label="Přes celou obrazovku"><img src="' + esc(mode === 'pred' ? v.original : v.url) + '" alt="' +
         (mode === 'pred' ? 'Původní fotka' : 'Vizualizace schodů ' + (i + 1)) + '"></button>';
       return '<figure class="viz-item"><div class="seg full viz-seg" role="group" aria-label="Zobrazení">' + MODES.map(function (m) {
           return '<button type="button" data-click="vizMode" data-i="' + i + '" data-m="' + m[0] + '" class="' + (m[0] === mode ? 'on' : '') + '" aria-pressed="' + (m[0] === mode) + '">' + m[1] + '</button>';
@@ -109,11 +110,19 @@ var Viz = (function () {
     var i = +el.dataset.i, v = +el.value, st = el.closest('.viz-stage');
     S.cut[i] = v; st.querySelector('.viz-after').style.clipPath = 'inset(0 0 0 ' + v + '%)'; st.querySelector('.viz-line').style.left = v + '%';
   });
+  /* přes celou obrazovku: u každé vizualizace výsledek, původní fotka a porovnání; šipkami mezi nimi */
+  function lbItems(c) {
+    var out = [];
+    (c.visuals || []).forEach(function (v) {
+      out.push({ src: v.url, caption: 'Vizualizace – ' + v.patternName, k: 'po' }, { src: v.original, caption: 'Původní fotka', k: 'pred' },
+        { before: v.original, after: v.url, caption: 'Porovnání – ' + v.patternName, k: 'cmp' });
+    });
+    return out;
+  }
   A.on('click', 'vizZoom', function (b) {
-    var c = cur, i = +b.dataset.i, v = c && (c.visuals || [])[i]; if (!v) return;
-    var pred = (S.mode[i] || 'po') === 'pred';
-    A.modal('<h2>' + (pred ? 'Původní fotka' : 'Vizualizace – ' + esc(v.patternName)) + '</h2><img class="viz-big" src="' + esc(pred ? v.original : v.url) + '" alt="">' +
-      '<div class="dlg-foot"><a class="btn" href="' + esc(pred ? v.original : v.url) + '" target="_blank" rel="noopener">Otevřít v plné velikosti</a><button class="btn primary" data-click="closeModal">Zavřít</button></div>');
+    var c = cur, i = +b.dataset.i; if (!c || !(c.visuals || [])[i]) return;
+    var k = b.dataset.k || S.mode[i] || 'po', items = lbItems(c);
+    A.lightbox(items, i * 3 + ({ po: 0, pred: 1, cmp: 2 }[k] || 0));
   });
   A.on('click', 'vizDel', function (b) {
     var c = cur, i = +b.dataset.i;

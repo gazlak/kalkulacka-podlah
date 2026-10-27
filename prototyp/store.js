@@ -8,15 +8,17 @@ var Store = (function () {
 
   /* ukázková vizualizace na fotce u točitého schodiště c6 (soubory v ukazky/, bez volání Gemini) */
   function demoViz(d) {
-    d.demoViz = 1;
+    d.demoViz = 2;
     var c = d.calculations.filter(function (x) { return x.id === 'c6'; })[0];
-    if (!c || (c.visuals || []).length) return d;
+    if (!c) return d;
+    if (!(c.photos || []).length) c.photos = ['ukazky/c6-foto.jpg']; // stejná fotka i v kroku Fotografie
+    if ((c.visuals || []).length) return d;
     c.visuals = [{ url: 'ukazky/c6-vizualizace.jpg', original: 'ukazky/c6-foto.jpg', patternId: c.patternId, patternName: '6014 DUB ALVIO LEPENÁ 0,5', createdAt: Date.now(), demo: true }];
     c.visualsUsed = Math.max(c.visualsUsed || 0, 1);
     return d;
   }
   function seed() {
-    if (typeof SEED_DB !== 'undefined') { var sd = clone(SEED_DB); sd.tokens = {}; sd.seedVersion = SEED_VERSION; return demoViz(sd); }
+    if (typeof SEED_DB !== 'undefined') { var sd = clone(SEED_DB); sd.tokens = {}; sd.seedVersion = SEED_VERSION; if (sd.rates && sd.rates.markup === undefined) sd.rates.markup = clone(DEFAULTS.rates.markup); if (sd.rates && sd.rates.stairPrice === undefined) sd.rates.stairPrice = clone(DEFAULTS.rates.stairPrice); if (sd.rates && sd.rates.landingPrice === undefined) sd.rates.landingPrice = clone(DEFAULTS.rates.landingPrice); return demoViz(sd); }
     var d = {
       patterns: clone(DEFAULTS.patterns),
       collections: clone(DEFAULTS.collections),
@@ -65,11 +67,46 @@ var Store = (function () {
       c.versions = [{ at: c.updatedAt || Date.now(), by: c.ownerId, kind: 'original', data: d }];
     });
   }
+  /* Společná data přes server.py (/api/db): kdo kalkulaci uloží, toho ji vidí i admin na jiném zařízení.
+   * Bez serveru (file://) nebo při výpadku zůstává jen localStorage. Volání jsou synchronní – prototyp, malá data. */
+  var REMOTE = /^https?:$/.test(location.protocol), rev = 0, basePricing = '', replaceNext = false;
+  function remote(method, body) {
+    if (!REMOTE) return null;
+    try {
+      var x = new XMLHttpRequest(); x.open(method, 'api/db', false);
+      if (body) x.setRequestHeader('Content-Type', 'application/json');
+      x.send(body ? JSON.stringify(body) : null);
+      if (x.status !== 200) return null;
+      var r = JSON.parse(x.responseText); return r && r.db ? r : false; // false = na serveru zatím nic není
+    } catch (e) { return null; }
+  }
+  function pricingKey(d) { return JSON.stringify([d.rates, d.patterns, d.collections]); }
+  // před přechodem na jinou obrazovku si stáhne novější společná data (nová kalkulace podlaháře, změna ceníku adminem)
+  function sync() {
+    var r = remote('GET');
+    if (r && r.db && r.rev > rev) { db = r.db; rev = r.rev; basePricing = pricingKey(db); try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { /* ignore */ } return true; }
+    return false;
+  }
   function load() {
+    var shared = remote('GET');
+    if (shared && shared.db) { rev = shared.rev; try { localStorage.setItem(KEY, JSON.stringify(shared.db)); } catch (e) { /* ignore */ } }
+    else if (shared === false) replaceNext = true; // na serveru zatím nic není – první uložení ho založí
+    basePricing = shared && shared.db ? pricingKey(shared.db) : '';
+    var out = loadLocal(), dirty = !shared;
+    // nový ceník (cena schodu od nejdražšího dekoru, 27. 10.): všechny kalkulace se jednou přepočítají podle aktuálního ceníku
+    if (!db.stairPrice27) { db.stairPrice27 = 1; db.calculations.forEach(function (c) { if (c.snapshot) c.snapshot = snapshotFor(c.patternId); }); dirty = true; }
+    if (dirty) save();
+    return db;
+  }
+  function loadLocal() {
     try { var raw = localStorage.getItem(KEY); if (raw) { db = JSON.parse(raw);
       // nový snapshot výchozích dat (seed-db.js) nahradí starší uložená data (jednou)
-      if (db && typeof SEED_DB !== 'undefined' && db.seedVersion !== SEED_VERSION) { db = seed(); save(); return db; }
+      if (db && typeof SEED_DB !== 'undefined' && db.seedVersion !== SEED_VERSION) { db = seed(); replaceNext = true; save(); return db; }
       if (db && db.users) { if (migrate(db)) save();
+      // doprava se nepočítá – uložený paušál se vynuluje (jednou); uložené kalkulace drží své ceny
+      if (!db.noTransport) { db.rates.transport = 0; db.noTransport = 1; save(); }
+      // práce 1 h na celý schod – podstupnice už nemá vlastní hodinu (jednou)
+      if (!db.stepHour) { db.rates.labor.riserHours = 0; db.stepHour = 1; save(); }
       if (!db.rates.m2) { db.rates.m2 = clone(DEFAULTS.rates.m2); db.rates.treadSurcharge = db.rates.treadSurcharge || clone(DEFAULTS.rates.treadSurcharge); save(); }
       // volitelné příplatky (demontáž, vyrovnání) a příplatek za podstupnici byly zrušeny – vyčistí se i z uložených dat
       if ((db.rates.extras || []).length || db.rates.extrasEnabled || db.rates.riserSurcharge !== undefined) { db.rates.extras = []; db.rates.extrasEnabled = false; delete db.rates.riserSurcharge; save(); }
@@ -77,6 +114,10 @@ var Store = (function () {
       if (!db.rates.cut) { db.rates.cut = clone(DEFAULTS.rates.cut); delete db.rates.cutMargin; save(); }
       else if (!db.rates.cut.vinyl) { var oc = db.rates.cut; db.rates.cut = { vinyl: { flatMm: oc.flatMm, noseMm: oc.noseMm }, mdf: { flatMm: oc.flatMm, noseMm: oc.noseMm, riserMm: oc.mdfRiserMm } }; save(); }
       if (db.rates.vinylInfoPct === undefined) { db.rates.vinylInfoPct = DEFAULTS.rates.vinylInfoPct; save(); }
+      if (db.rates.markup === undefined) { db.rates.markup = clone(DEFAULTS.rates.markup); save(); }
+      // cena schodu od nejdražšího dekoru (podle ceníku AKTO) přibyla 27. 10. – doplní se jednou
+      if (db.rates.stairPrice === undefined) { db.rates.stairPrice = clone(DEFAULTS.rates.stairPrice); save(); }
+      if (db.rates.landingPrice === undefined) { db.rates.landingPrice = clone(DEFAULTS.rates.landingPrice); save(); }
       // výchozí hodinová sazba 400 Kč/h se doplní jednou; pozdější vymazání v Sazbách zůstane platné
       if (!db.hourly400) { db.hourly400 = 1; if (db.rates.labor && db.rates.labor.hourly === null) db.rates.labor.hourly = 400; save(); }
       if (db.rates.allowance && (db.rates.allowance.depth || db.rates.allowance.riser)) { db.rates.allowance.depth = 0; db.rates.allowance.riser = 0; save(); }
@@ -85,13 +126,19 @@ var Store = (function () {
       // ukázky typů schodišť (d1–d7) přibyly později – doplní se jednou
       if (!db.demoStairs) { db.demoStairs = 1; DEFAULTS.calculations.forEach(function (c) { if (c.demo && !calcById(c.id)) db.calculations.push(seedCalc(c)); }); save(); }
       if (!db.verOrig) { origVersions(); save(); }
-      if (!db.demoViz) { demoViz(db); save(); }
+      if ((db.demoViz || 0) < 2) { demoViz(db); save(); }
       return db; } } } catch (e) { /* poškozená data */ }
-    db = seed(); origVersions(); save();
+    db = seed(); origVersions(); replaceNext = true; save();
     return db;
   }
-  function save() { try { localStorage.setItem(KEY, JSON.stringify(db)); return true; } catch (e) { return false; } }
-  function reset() { db = seed(); origVersions(); save(); }
+  function save() {
+    var ok = true;
+    try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { ok = false; }
+    var r = remote('PUT', { db: db, pricingChanged: pricingKey(db) !== basePricing, replace: replaceNext });
+    if (r && r.db) { db = r.db; rev = r.rev; basePricing = pricingKey(db); replaceNext = false; try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { /* ignore */ } return true; }
+    return ok;
+  }
+  function reset() { db = seed(); origVersions(); replaceNext = true; save(); }
 
   /* ----- session ----- */
   function setSession(userId, remember) {
@@ -161,7 +208,7 @@ var Store = (function () {
   }
 
   return {
-    get db() { return db; }, load: load, save: save, reset: reset, clone: clone, uid: uid,
+    get db() { return db; }, load: load, save: save, sync: sync, get shared() { return REMOTE && rev > 0; }, reset: reset, clone: clone, uid: uid,
     setSession: setSession, clearSession: clearSession, currentUser: currentUser,
     userById: userById, userByEmail: userByEmail,
     calcById: calcById, calcsFor: calcsFor, canSee: canSee, upsertCalc: upsertCalc, nextNumber: nextNumber,

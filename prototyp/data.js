@@ -42,14 +42,23 @@ var DEFAULTS = {
   }),
   rates: {
     // STARÁ pole (m2.byTread, extras edges/trims) čte jen legacy cesta výpočtu; nová cesta je nečte
-    transport: 1500,
+    transport: 0,  // doprava se nepočítá (zdarma); správce ji může zadat v Sazbách
     mdf: { thicknessMm: 12, eurPerM3: 375 }, eur: { rate: 25, changedAt: Date.now() },
     glue: { czkPerKg: 324, gPerM2: 300, layers: 1 },
     reserve: { pct: 5, onVinyl: false },
-    labor: { hourly: 400, hoursByTread: { nose: 1, flat: 1 }, riserHours: 1 },
+    labor: { hourly: 400, hoursByTread: { nose: 1, flat: 1 }, riserHours: 0 },  // 1 h na celý schod (nášlap i podstupnice)
     trimPerBm: 99, edgePerBm: null,
     cut: { vinyl: { flatMm: 136, noseMm: 126 }, mdf: { flatMm: 136, noseMm: 126, riserMm: 50 } },  // rezerva na ořez zvlášť pro vinyl a MDF: hloubka nášlapu bez nosu / s nosem, přídavek k výšce podstupnice jen u MDF
     vinylInfoPct: 50,  // informativní „vinyl −50 %“ jen pro admina, mimo cenu
+    // cena = výroba + přirážky z výroby (odběratel, podlahář, my); výroba = vinyl za nákup v % MOC + MDF + lepidlo + práce, lišta mimo výrobu
+    markup: { on: true, buyPct: 50, buyerPct: 50, floorerPct: 30, oursPct: 20, trimInProduction: false },
+    // cena schodu od nejdražšího dekoru (má přednost před přirážkami): referenční schod rovný 1200 × 330 mm s nejdražším vinylem
+    // za MOC = topPrice bez DPH; levnější dekor = topPrice − rozdíl ceny vinylu; cena za m² podle naměřené plochy nášlapu,
+    // podstupnice riserPct % ceny schodu za m² (ceník AKTO: 1 700 Kč/bm schod 330 mm vs. 1 000 Kč/1,2 m podstupnice 200 mm ≈ 81 %)
+    stairPrice: { on: true, topPrice: 3500, refWidthMm: 1200, refDepthMm: 330, riserPct: 80, productionPerStair: 1000, floorerPct: 30, wastePct: 10 },
+    // podestový schod (plachta): vinyl přímo na podestu, horní MDF není; čelo 2 × MDF 12 mm (s nosem výška 40 mm a 1 lamela,
+    // bez nosu výška podle podstupnice a 2 lamely – podstupnice je tím v ceně). Referenční podesta s nejdražším vinylem = topPrice.
+    landingPrice: { on: true, topPrice: 3000, refWidthMm: 1200, refDepthMm: 1000, productionPerStair: 800, floorerPct: 30, wastePct: 10, noseEdgeMm: 40, mdfLayers: 2 },
     allowance: { width: 3, depth: 0, riser: 0 },  // starý přídavek – jen pro uložené kalkulace bez cut a cutMargin
     nose: { mdfOverhangMm: 0, mdfWrapMm: 0, vinylOverhangMm: 0, vinylWrapMm: 0 },
     wasteMode: 'lamellas',

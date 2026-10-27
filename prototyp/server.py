@@ -17,6 +17,7 @@ import ssl
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -198,6 +199,67 @@ def used(calc_id: str) -> int:
     return sum(1 for n in os.listdir(OUT_DIR) if pat.match(n))
 
 
+DATA_DIR = os.path.join(ROOT, "data")
+DB_FILE = os.path.join(DATA_DIR, "db.json")
+PRICING_KEYS = ("rates", "patterns", "collections")
+_db_lock = threading.Lock()
+
+
+def db_read() -> dict | None:
+    """Společná data prototypu ({"rev": n, "db": {...}}), nebo None, když ještě nikdo nic neuložil."""
+    try:
+        with open(DB_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+
+def _by_id(items) -> dict:
+    return {x.get("id"): x for x in items or [] if isinstance(x, dict) and x.get("id")}
+
+
+def db_merge(server: dict, incoming: dict, pricing_changed: bool) -> dict:
+    """Sloučí data jednoho prohlížeče se společnými. Kalkulace po id (novější updatedAt vyhrává), uživatelé po id,
+    tokeny sjednotí. Ceník (sazby, vzory, kolekce) se přepíše, jen když ho tento prohlížeč změnil. Nic se nemaže."""
+    out = dict(server)
+    for k, v in incoming.items():
+        if k in ("calculations", "users", "tokens") or k in PRICING_KEYS:
+            continue
+        out[k] = v
+    calcs = _by_id(server.get("calculations"))
+    for c in incoming.get("calculations") or []:
+        cur = calcs.get(c.get("id"))
+        if cur is None or (c.get("updatedAt") or 0) >= (cur.get("updatedAt") or 0):
+            calcs[c.get("id")] = c
+    out["calculations"] = list(calcs.values())
+    users = _by_id(server.get("users"))
+    users.update(_by_id(incoming.get("users")))
+    out["users"] = list(users.values())
+    out["tokens"] = {**(server.get("tokens") or {}), **(incoming.get("tokens") or {})}
+    if pricing_changed:
+        for k in PRICING_KEYS:
+            if k in incoming:
+                out[k] = incoming[k]
+    return out
+
+
+def db_write(body: dict) -> tuple[int, dict]:
+    db = body.get("db") if isinstance(body, dict) else None
+    if not isinstance(db, dict) or not isinstance(db.get("calculations"), list) or not isinstance(db.get("users"), list):
+        return 400, {"error": "Neplatná data"}
+    with _db_lock:
+        cur = db_read()
+        if cur and not body.get("replace"):
+            db = db_merge(cur.get("db") or {}, db, bool(body.get("pricingChanged")))
+        rec = {"rev": (cur or {}).get("rev", 0) + 1, "db": db}
+        os.makedirs(DATA_DIR, exist_ok=True)
+        tmp = DB_FILE + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(rec, f, ensure_ascii=False)
+        os.replace(tmp, DB_FILE)
+        return 200, rec
+
+
 class Handler(http.server.SimpleHTTPRequestHandler):
     gemini = staticmethod(call_gemini)  # testy podvrhnou
     decor = staticmethod(fetch_decor)
@@ -226,9 +288,25 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             calc = (urllib.parse.parse_qs(u.query).get("calc") or [""])[0]
             n = used(calc) if CALC_ID.match(calc) else 0
             return self._json(200, {"ok": True, "key": bool(api_key()), "used": n, "limit": LIMIT})
-        if u.path.startswith("/api/"):
+        if u.path == "/api/db":
+            rec = db_read()
+            return self._json(200, rec or {"rev": 0, "db": None})  # bez dat: prázdné, ať prohlížeč nehlásí chybu
+        if u.path.startswith("/api/") or u.path.startswith("/data/"):
             return self._json(404, {"error": "Neznámá adresa"})
         return super().do_GET()
+
+    def do_PUT(self):
+        if urllib.parse.urlparse(self.path).path != "/api/db":
+            return self._json(404, {"error": "Neznámá adresa"})
+        length = int(self.headers.get("Content-Length") or 0)
+        if length <= 0 or length > 60 * 1024 * 1024:
+            return self._json(400, {"error": "Neplatná velikost dat"})
+        try:
+            body = json.loads(self.rfile.read(length))
+        except ValueError:
+            return self._json(400, {"error": "Neplatný požadavek"})
+        code, obj = db_write(body)
+        return self._json(code, obj)
 
     def do_POST(self):
         if urllib.parse.urlparse(self.path).path != "/api/vizualizace":
@@ -297,8 +375,10 @@ def visualize(body: dict, gemini=call_gemini, decor_fetch=fetch_decor) -> tuple[
 
 def main() -> None:
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8801
-    srv = http.server.ThreadingHTTPServer(("127.0.0.1", port), Handler)
-    print(f"Prototyp: http://localhost:{port}  (Gemini klíč: {'ano' if api_key() else 'chybí'})")
+    host = os.environ.get("HOST", "127.0.0.1")  # HOST=0.0.0.0 zpřístupní prototyp i ostatním v síti
+    srv = http.server.ThreadingHTTPServer((host, port), Handler)
+    print(f"Prototyp: http://{'localhost' if host == '127.0.0.1' else host}:{port}  (Gemini klíč: {'ano' if api_key() else 'chybí'}, "
+          f"společná data: {DB_FILE})")
     srv.serve_forever()
 
 

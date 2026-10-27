@@ -101,7 +101,7 @@
     var body = s === 1 ? stepPhotos(c) : s === 2 ? stepStairs(c) : s === 3 ? stepPattern(c) : s === 4 ? stepJob(c) : calcBody(c, true);
     A.render(head + (s > 2 ? stairsSummary(c) : '') + (s < 5 ? priceNotice(c) : '') + body, { title: c.number ? 'Úprava kalkulace' : 'Nová kalkulace', back: '#/history', saved: saved, bar: actionBar(c, s) });
     barUpdate();
-    if (s === 5) Viz.mount(c, ro(c));
+    if (s === 5 || (s === 1 && c.patternId)) Viz.mount(c, ro(c));
     if (W.showErrors) { W.showErrors = false; showStepErrors(c, s); }
   });
   /* kroky 3–5: stručný souhrn zadaných schodů, klepnutím zpět na krok 2 */
@@ -174,7 +174,9 @@
     return (bare ? '' : '<h1 class="wiz-title">Fotografie</h1><p class="lead-text">Vyfoťte schodiště nebo nahrajte fotky z galerie. Počet není omezený, krok lze přeskočit.</p>') +
       '<div class="btn-grid"><label class="btn primary">' + ic('camera') + 'Vyfotit<input type="file" class="sr" accept="image/*" capture="environment" data-change="photoAdd" aria-label="Vyfotit schodiště"></label>' +
       '<label class="btn">' + ic('plus') + 'Nahrát fotky<input type="file" class="sr" accept="image/*" multiple data-change="photoAdd" aria-label="Nahrát fotky"></label></div>' +
-      '<div id="photoGrid">' + photoGrid(c, true) + '</div>';
+      '<div id="photoGrid">' + photoGrid(c, true) + '</div>' +
+      // vizualizace potřebuje vybraný vzor – v průvodci se ukáže u fotek, jakmile vzor existuje (rozpracovaná kalkulace)
+      (!bare && c.patternId ? '<div id="vizCard"></div>' : '');
   }
   function refreshPhotos() { var g = A.$('#photoGrid'); if (g) g.innerHTML = photoGrid(W.c, true); }
   A.on('change', 'photoAdd', function (el) {
@@ -195,7 +197,8 @@
     (c.photos || []).splice(+el.dataset.i, 1); touch(c); refreshPhotos();
   });
   A.on('click', 'photoZoom', function (el) {
-    var d = ((W.c || {}).photos || [])[+el.dataset.i]; if (d) A.modal('<img class="photo-big" src="' + d + '" alt="Fotka">');
+    var ph = (W.c || {}).photos || [];
+    A.lightbox(ph.map(function (d, i) { return { src: d, caption: 'Fotka ' + (i + 1) }; }), +el.dataset.i);
   });
 
   /* krok 4: zakázka */
@@ -540,6 +543,9 @@
       var sub = l.sub + (l.key === 'material' && hasCut ? ', vč. rezervy na ořez' : '');
       return lr(esc(l.label), qtyText(l) + (sub ? ' · ' + esc(sub) : ''), fmt(l.amount) + (l.key === 'material' && q.vinylInfo ? '<small class="sub">po slevě ' + Calc.n0(q.vinylInfo.pct) + ' %: ' + fmt(q.vinylInfo.amount) + '</small>' : ''));
     }).join('');
+    if (q.stairMode && full()) { var sp = q.stair.split;
+      h += lr('<span class="muted">Z toho vinyl (MOC)</span>', '', '<span class="muted">' + fmt(sp.vinyl) + '</span>') + lr('<span class="muted">Naše výroba</span>', q.treads + ' schodů', '<span class="muted">' + fmt(sp.production) + '</span>') +
+        lr('<span class="muted">Podlahář</span>', Calc.n0(r.stairPrice.floorerPct) + ' %', '<span class="muted">' + fmt(sp.floorer) + '</span>') + lr('<span class="muted">Odběratel</span>', 'zbytek', '<span class="muted">' + fmt(sp.buyer) + '</span>'); }
     if (q.discountAmount > 0) h += lr('Mezisoučet', '', fmt(q.subtotal)) + lr('Sleva', c.discount.type === 'pct' ? Calc.n0(c.discount.value) + ' %' : '', '− ' + fmt(q.discountAmount), 'minus');
     h += lr('Cena bez DPH', '', fmt(q.base), 'tot') + lr('DPH ' + pct(c.vatRate), '', fmt(q.vat)) + lr('Celkem s DPH', r.roundTo > 1 ? 'zaokrouhleno na ' + r.roundTo + ' Kč' : '', fmt(q.total), 'tot') + '</div>';
     return h;
@@ -858,10 +864,10 @@
           '<div class="pr"><b>' + fmt(x.quote.total) + '</b><small>' + (best ? '<span class="badge st-přijato">Nejlevnější</span>' : '+ ' + fmt(diff)) + '</small></div>' +
           '<div class="use">' + use(x) + '</div></div>';
       }).join('') + '</div>' +
-      (f ? '<div class="card only-desktop" style="overflow:auto"><table class="tbl"><thead><tr><th>Vzor</th><th class="num">Materiál</th><th class="num">Práce</th><th class="num">Podstupnice</th><th class="num">Doprava</th><th class="num">Bez DPH</th><th class="num">S DPH</th><th class="num">Rozdíl</th><th></th></tr></thead><tbody>' +
+      (f ? '<div class="card only-desktop" style="overflow:auto"><table class="tbl"><thead><tr><th>Vzor</th><th class="num">Materiál</th><th class="num">Práce</th><th class="num">Bez DPH</th><th class="num">S DPH</th><th class="num">Rozdíl</th><th></th></tr></thead><tbody>' +
       cmp.map(function (x) {
         var q = x.quote;
-        return '<tr class="' + (q.total === min ? 'best' : '') + '"><td><img class="thumb" src="' + A.patternImg(x.pattern) + '" alt=""><b>' + esc(x.pattern.name) + '</b>' + (q.total === min ? ' <span class="badge st-přijato">Nejlevnější</span>' : '') + (q.needsJoint ? JOINT : '') + '</td><td class="num">' + fmt(q.material) + '</td><td class="num">' + fmt(q.labor) + '</td><td class="num">' + fmt(q.risers) + '</td><td class="num">' + fmt(q.transport) + '</td><td class="num">' + fmt(q.base) + '</td><td class="num"><b>' + fmt(q.total) + '</b></td><td class="num">' + (q.total === min ? '—' : '+ ' + fmt(q.total - min)) + '</td><td>' + use(x) + '</td></tr>';
+        return '<tr class="' + (q.total === min ? 'best' : '') + '"><td><img class="thumb" src="' + A.patternImg(x.pattern) + '" alt=""><b>' + esc(x.pattern.name) + '</b>' + (q.total === min ? ' <span class="badge st-přijato">Nejlevnější</span>' : '') + (q.needsJoint ? JOINT : '') + '</td><td class="num">' + fmt(q.material) + '</td><td class="num">' + fmt(q.labor) + '</td><td class="num">' + fmt(q.base) + '</td><td class="num"><b>' + fmt(q.total) + '</b></td><td class="num">' + (q.total === min ? '—' : '+ ' + fmt(q.total - min)) + '</td><td>' + use(x) + '</td></tr>';
       }).join('') + '</tbody></table></div>' : ''), { wide: true, title: 'Porovnání vzorů', back: back, bare: false });
   });
   A.on('click', 'usePattern', function (el) { if (ro()) return;

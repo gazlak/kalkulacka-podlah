@@ -661,3 +661,22 @@ html { scroll-padding-top: 72px; scroll-padding-bottom: 180px; }
 .prod-note { min-height: 56px; border: 1px solid #d8dbe2; border-radius: 6px; padding: 8px; white-space: pre-line; }
 .prod-sign { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-4); margin: var(--s-5) 0 var(--s-3); font-size: .8rem; color: #5f6673; break-inside: avoid; }
 .prod-sign span { display: block; border-bottom: 1px solid #1a1d24; height: 36px; }
+
+/* prohlížeč přes celou obrazovku */
+.lightbox { position: fixed; inset: 0; z-index: 2147483000; background: #0b0c10; display: flex; align-items: center; justify-content: center; outline: none; }
+.lightbox[hidden] { display: none; }
+body.lb-open { overflow: hidden; }
+.lb-stage { width: 100vw; height: 100dvh; display: flex; align-items: center; justify-content: center; padding: 56px 64px 64px; box-sizing: border-box; }
+.lb-img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 6px; box-shadow: 0 10px 40px rgba(0,0,0,.5); user-select: none; }
+.lb-cmp { position: relative; height: 100%; max-width: 100%; aspect-ratio: 3 / 4; border-radius: 6px; overflow: hidden; }
+.lb-cmp > img, .lb-after img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.lb-after { position: absolute; inset: 0; }
+.lb-cmp .viz-range { position: absolute; inset: 0; width: 100%; height: 100%; }
+.lb-btn { position: absolute; border: 0; background: rgba(255,255,255,.12); color: #fff; width: 48px; height: 48px; border-radius: 50%; font-size: 30px; line-height: 1; cursor: pointer; display: grid; place-items: center; }
+.lb-btn:hover { background: rgba(255,255,255,.25); }
+.lb-close { top: 12px; right: 12px; }
+.lb-prev { left: 12px; top: 50%; transform: translateY(-50%); } .lb-next { right: 12px; top: 50%; transform: translateY(-50%); }
+.lb-cap { position: absolute; bottom: 16px; left: 0; right: 0; text-align: center; color: #e8e8ea; font-size: 14px; pointer-events: none; }
+.lb-cap span { margin-left: 12px; opacity: .7; }
+@media (max-width: 600px) { .lb-stage { padding: 56px 8px 56px; } .lb-prev, .lb-next { top: auto; bottom: 8px; transform: none; } .lb-cmp { aspect-ratio: auto; width: 100%; height: auto; } .lb-cmp > img { position: relative; height: auto; } }
+.viz-full { position: absolute; right: 10px; bottom: 10px; width: 40px; height: 40px; border: 0; border-radius: 50%; background: rgba(0,0,0,.6); color: #fff; font-size: 20px; cursor: pointer; z-index: 2; }

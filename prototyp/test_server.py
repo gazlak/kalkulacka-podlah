@@ -212,3 +212,32 @@ class HttpTest(Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ---- společná data (/api/db) ----
+def _db(calcs, top=3500):
+    return {"users": [{"id": "u1"}], "tokens": {}, "calculations": calcs, "rates": {"stairPrice": {"topPrice": top}},
+            "patterns": [], "collections": []}
+
+
+def test_db_merge_keeps_calcs_of_both_and_newer_wins():
+    srv = _db([{"id": "a", "updatedAt": 5, "v": "srv"}, {"id": "b", "updatedAt": 1}])
+    inc = _db([{"id": "a", "updatedAt": 3, "v": "old"}, {"id": "c", "updatedAt": 9}])
+    out = server.db_merge(srv, inc, False)
+    by = {c["id"]: c for c in out["calculations"]}
+    assert set(by) == {"a", "b", "c"} and by["a"]["v"] == "srv"
+
+
+def test_db_merge_pricing_only_when_changed():
+    srv, inc = _db([], top=3600), _db([], top=3500)
+    assert server.db_merge(srv, inc, False)["rates"]["stairPrice"]["topPrice"] == 3600
+    assert server.db_merge(srv, inc, True)["rates"]["stairPrice"]["topPrice"] == 3500
+
+
+def test_db_write_rejects_invalid_and_counts_rev(tmp_path, monkeypatch):
+    monkeypatch.setattr(server, "DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(server, "DB_FILE", str(tmp_path / "db.json"))
+    assert server.db_write({"db": {"users": []}})[0] == 400
+    assert server.db_write({"db": _db([{"id": "a"}])})[1]["rev"] == 1
+    code, rec = server.db_write({"db": _db([{"id": "b"}])})
+    assert code == 200 and rec["rev"] == 2 and {c["id"] for c in rec["db"]["calculations"]} == {"a", "b"}

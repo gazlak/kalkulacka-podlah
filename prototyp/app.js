@@ -41,13 +41,16 @@ var App = (function () {
     { k: 'spiral', t: 'Točité / lichoběžníkové schody', x: 'Zadání počítá jen s obdélníkovými nášlapy. Jak řešit točité schody a zkosené nášlapy?' },
     { k: 'photos', t: 'Fotky vzorů', x: 'Ukázkové fotky jsou nahrazeny texturami. Správce nahraje skutečné fotky v administraci. Stačí jedna fotka na vzor?' },
     { k: 'labor', t: 'Práce: normohodiny', x: 'Nahrazeno normohodinami: práce = počet nášlapů × hodiny podle typu nášlapu × hodinová sazba, podstupnice zvlášť. Souhlasí takový model, nebo se má účtovat za m² / za kus?' },
+    { k: 'landingEdge', t: 'Podesta – lišta a hrana', x: 'Jak se u podestového schodu (plachty) vede lišta KPV50 a vinylová hrana? Zatím se počítají po stranách jako u schodů; doplní se.' },
+    { k: 'landingProduction', t: 'Podesta – cena výroby', x: 'Kolik stojí výroba podestového schodu (práce na plachtu a čelo, normohodiny)? Zatím pevně 800 Kč za kus; materiál čela (2 × MDF 12 mm + lepidlo jen na čelo) z našich sazeb je jen pár desítek Kč.' },
+    { k: 'landingRef', t: 'Podesta – referenční rozměr', x: 'Pro jakou velikost podesty platí cílová cena 3 000 Kč (nejdražší dekor)? Zatím 1200 × 1000 mm – při ní vinyl za MOC zabere přes 1 100 Kč a odběrateli zbude jen málo. Větší podesty se přepočítávají podle plochy.' },
     { k: 'stepKindPrice', t: 'Typ schodu a cena', x: 'Má typ schodu Rovný / Šikmý · rohový nějaký vliv na cenu (příplatek, normohodiny, rezerva)? Zatím je jen informativní.' },
     { k: 'glueLayers', t: 'Lepidlo: 1× nebo 2× nános', x: 'Lepí se jen vinyl na MDF (1×), nebo i MDF na podklad (2×)? Řeší přepínač v Sazbách.' },
     { k: 'variants', t: 'Nabízené varianty', x: 'Má se nabízet LEPENÁ i CLICK varianta u všech kolekcí? V Kolekcích jde zapnout/vypnout každou zvlášť.' },
     { k: 'mocPrice', t: 'MOC a cena pro podlaháře', x: 'Ceny v tabulce jsou doporučené (MOC) bez DPH. Počítá podlahář s MOC, nebo s vlastní nákupní cenou / slevou z ceníku?' },
     { k: 'eurRate', t: 'Kurz EUR/CZK', x: 'Který kurz (ČNB, vlastní, pevný) a jak často se mění? Prototyp ukládá datum poslední změny hodnoty.' },
     { k: 'lamellaJoint', t: 'Spoj lamel', x: 'Když je schod širší než lamela, musí se lamely nastavovat. Je to přípustné, nebo se má nabídnout jen kolekce s delší lamelou? Odřezky se zatím počítají do nastavení.' },
-    { k: 'laborHours', t: 'Normohodiny', x: 'Kolik hodin trvá obložení jednoho nášlapu (s nosem, bez nosu) a jedné podstupnice? Zatím 1 h pro všechno.' },
+    { k: 'laborHours', t: 'Normohodiny', x: 'Kolik hodin trvá obložení jednoho schodu (s nosem, bez nosu)? Zatím 1 h na celý schod včetně podstupnice.' },
     { k: 'hourlyRate', t: 'Hodinová sazba', x: 'Hodinová sazba je zatím 400 Kč/h – potvrdit? Pokud by sazba nebyla zadaná, kalkulace ukazuje upozornění „Cena není kompletní“.' },
     { k: 'edgePrice', t: 'Cena vinylové hrany', x: 'Kolik stojí vinylová hrana za bm? Cena zatím chybí.' },
     { k: 'trimRoute', t: 'Vedení lišty a hrany', x: 'Lišta se vede u strany přiléhající ke zdi, hrana na otevřené straně. Odpovídá to praxi? Počítá se z naměřených rozměrů (hloubka strany + podstupnice).' },
@@ -93,6 +96,51 @@ var App = (function () {
     if (!m.open) m.showModal();
   };
   A.sheetList = function (rows) { return '<div class="list sheet-list">' + rows + '</div>'; };
+  /* Prohlížeč fotek přes celou obrazovku. items = [{src, caption}] nebo {before, after, caption} (porovnání posuvníkem).
+     Zavření: ×, Esc, klik mimo obrázek. Přepínání: šipky, klávesy ←/→, tažení prstem. */
+  var LB = null;
+  A.lightbox = function (items, start) {
+    if (!items || !items.length) return;
+    LB = { items: items, i: Math.max(0, Math.min(items.length - 1, start || 0)), cut: 50 };
+    var el = document.getElementById('lightbox');
+    if (!el) { el = document.createElement('div'); el.id = 'lightbox'; el.className = 'lightbox'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); document.body.appendChild(el); bindLb(el); }
+    drawLb(); el.hidden = false; document.body.classList.add('lb-open'); el.focus();
+  };
+  function drawLb() {
+    var el = document.getElementById('lightbox'), it = LB.items[LB.i], n = LB.items.length, stage;
+    if (it.before) stage = '<div class="lb-cmp"><img src="' + esc(it.before) + '" alt="Před"><div class="lb-after" style="clip-path:inset(0 0 0 ' + LB.cut + '%)"><img src="' + esc(it.after) + '" alt="Po"></div>' +
+      '<span class="viz-line" style="left:' + LB.cut + '%"></span><span class="viz-tag l">Před</span><span class="viz-tag r">Po</span>' +
+      '<input type="range" class="viz-range lb-range" min="0" max="100" value="' + LB.cut + '" aria-label="Porovnání před a po"></div>';
+    else stage = '<img class="lb-img" src="' + esc(it.src) + '" alt="' + esc(it.caption || '') + '">';
+    el.innerHTML = '<div class="lb-stage">' + stage + '</div>' +
+      '<button type="button" class="lb-btn lb-close" data-lb="close" aria-label="Zavřít">×</button>' +
+      (n > 1 ? '<button type="button" class="lb-btn lb-prev" data-lb="prev" aria-label="Předchozí">‹</button><button type="button" class="lb-btn lb-next" data-lb="next" aria-label="Další">›</button>' : '') +
+      '<div class="lb-cap">' + esc(it.caption || '') + (n > 1 ? '<span>' + (LB.i + 1) + ' / ' + n + '</span>' : '') + '</div>';
+  }
+  function closeLb() { var el = document.getElementById('lightbox'); if (el) el.hidden = true; document.body.classList.remove('lb-open'); LB = null; }
+  function stepLb(d) { if (!LB || LB.items.length < 2) return; LB.i = (LB.i + d + LB.items.length) % LB.items.length; drawLb(); }
+  function bindLb(el) {
+    el.tabIndex = -1;
+    el.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-lb]');
+      if (b) { var a = b.dataset.lb; if (a === 'close') closeLb(); else stepLb(a === 'next' ? 1 : -1); return; }
+      if (!e.target.closest('img, input')) closeLb(); // klik mimo obrázek
+    });
+    el.addEventListener('input', function (e) {
+      if (!e.target.classList.contains('lb-range') || !LB) return;
+      LB.cut = +e.target.value;
+      el.querySelector('.lb-after').style.clipPath = 'inset(0 0 0 ' + LB.cut + '%)'; el.querySelector('.viz-line').style.left = LB.cut + '%';
+    });
+    var x0 = null;
+    el.addEventListener('touchstart', function (e) { x0 = e.target.classList.contains('lb-range') ? null : e.touches[0].clientX; }, { passive: true });
+    el.addEventListener('touchend', function (e) { if (x0 === null) return; var dx = e.changedTouches[0].clientX - x0; if (Math.abs(dx) > 50) stepLb(dx < 0 ? 1 : -1); x0 = null; });
+    document.addEventListener('keydown', function (e) {
+      if (!LB) return;
+      if (e.key === 'Escape') { e.preventDefault(); closeLb(); } else if (e.key === 'ArrowRight') stepLb(1); else if (e.key === 'ArrowLeft') stepLb(-1);
+    });
+    window.addEventListener('hashchange', closeLb);
+  }
+
   A.closeModal = function () { var m = document.getElementById('modal'); if (m.open) m.close(); };
   A.confirmDlg = function (title, text, okLabel, fn, danger) {
     confirmFn = fn;
@@ -172,6 +220,7 @@ var App = (function () {
       (user.role === 'admin' ? tab('/admin/users', 'settings', 'Správa', '', /^\/admin/.test(p)) : '');
   }
   function dispatch() {
+    if (Store.sync) Store.sync(); // novější společná data (kalkulace jiných, změna ceníku) před vykreslením
     timers.forEach(clearInterval); timers = [];
     A.closeModal();
     var path = location.hash.replace(/^#/, '') || '/history';

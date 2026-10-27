@@ -32,7 +32,7 @@ var Calc = (function () {
   ];
   var TREAD_TYPES = [{ id: 'nose', label: 'S nosem', nose: true }, { id: 'flat', label: 'Bez nosu' }];
   // typ schodu (skupina): zatím jen informativní, cenu nemění
-  var STEP_KINDS = [{ id: 'straight', label: 'Rovný' }, { id: 'skew', label: 'Šikmý / rohový' }];
+  var STEP_KINDS = [{ id: 'straight', label: 'Rovný' }, { id: 'skew', label: 'Šikmý / rohový' }, { id: 'landing', label: 'Podestový (plachta)' }];
   // podestové typy zrušeny; staré uložené id se převede na běžné
   var OLD_TREAD = { landingNose: 'nose', landingFlat: 'flat' };
   function pick(list, id) { for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i]; return list[0]; }
@@ -40,6 +40,7 @@ var Calc = (function () {
   function treadType(g) { return pick(TREAD_TYPES, OLD_TREAD[g.treadType] || g.treadType); }
   function stepKind(g) { return pick(STEP_KINDS, g.stepKind === 'corner' ? 'skew' : g.stepKind); }
   function hasNose(g) { return !!treadType(g).nose; }
+  function isLanding(g) { return g.stepKind === 'landing'; }
 
   // plocha jedné skupiny v m²; š=šířka, h=hloubka nášlapu, v=výška podstupnice, p=obkládat podstupnici, n=počet
   function groupArea(g) {
@@ -165,8 +166,36 @@ var Calc = (function () {
       gluePerM2: n0(g.czkPerKg) * n0(g.gPerM2) / 1000, glueLayers: n0(g.layers) >= 2 ? 2 : 1,
       reserve: n0(rs.pct) / 100, reserveOnVinyl: !!rs.onVinyl,
       trimPerBm: n0(rates.trimPerBm), edgePerBm: isNaN(num(rates.edgePerBm)) ? null : num(rates.edgePerBm),
-      wasteMode: rates.wasteMode === 'pct' ? 'pct' : 'lamellas'
+      wasteMode: rates.wasteMode === 'pct' ? 'pct' : 'lamellas',
+      markup: rates.markup && rates.markup.on ? { buy: n0(rates.markup.buyPct) / 100, buyer: n0(rates.markup.buyerPct), floorer: n0(rates.markup.floorerPct), ours: n0(rates.markup.oursPct), trim: !!rates.markup.trimInProduction } : null,
+      stairPrice: rates.stairPrice && rates.stairPrice.on ? rates.stairPrice : null
     };
+  }
+
+  /* Cena schodu od nejdražšího dekoru (rates.stairPrice). Referenční schod (rovný refWidth × refDepth, s nosem) s nejdražším
+   * vinylem za MOC stojí topPrice bez DPH. Levnější dekor = topPrice − (nejdražší − jeho cena za m²) × spotřeba vinylu
+   * referenčního schodu. Cena za m² schodu = cena referenčního schodu / jeho plocha; podstupnice riserPct % z toho.
+   * Rozpis referenčního schodu: vinyl (MOC) + výroba (MDF, lepidlo, práce) + podlahář % z ceny + odběratel zbytek. */
+  function topVinylPrice(pricing) {
+    var max = 0;
+    (pricing.collections || []).forEach(function (c) { if (c.active !== false) max = Math.max(max, n0(c.materialPerM2)); });
+    (pricing.patterns || []).forEach(function (p) { if (patternOffered(pricing, p) && p.priceOverride !== null && p.priceOverride !== undefined && p.priceOverride !== '') max = Math.max(max, n0(p.priceOverride)); });
+    return max;
+  }
+  function stairRates(pricing, vinylPerM2, key) {
+    var rates = pricing.rates || {}, sp = rates[key || 'stairPrice'];
+    if (!sp || !sp.on) return null;
+    var d = defaults(rates), w = n0(sp.refWidthMm) / 1000, dep = n0(sp.refDepthMm) / 1000;
+    var noseCut = d.cut ? d.cut.vinyl.nose / 1000 : 0, waste = 1 + n0(sp.wastePct) / 100;
+    var refArea = w * dep, refVinylM2 = w * (dep + noseCut) * waste, top = topVinylPrice(pricing), topPrice = n0(sp.topPrice);
+    function forPrice(p) {
+      var stair = topPrice - (top - p) * refVinylM2, perM2 = refArea > 0 ? stair / refArea : 0;
+      var vinyl = p * refVinylM2, production = n0(sp.productionPerStair), floorer = stair * n0(sp.floorerPct) / 100;
+      return { stair: stair, perM2: perM2, riserPerM2: perM2 * n0(sp.riserPct) / 100, vinyl: vinyl, production: production, floorer: floorer, buyer: stair - vinyl - production - floorer };
+    }
+    var r = forPrice(vinylPerM2 === undefined ? top : vinylPerM2);
+    r.top = top; r.refArea = refArea; r.refVinylM2 = refVinylM2; r.cfg = sp; r.forPrice = forPrice;
+    return r;
   }
   // rozměry jednoho dílce v cm: šířka, hloubka pro MDF a pro vinyl, podstupnice, největší hloubka (šikmý schod)
   function pieceDims(g, rates) {
@@ -309,21 +338,22 @@ var Calc = (function () {
       return amount;
     }
     var res = 1 + d.reserve, missing = [];
+    if (d.stairPrice) return stairQuote(groups, pat, pricing, price, discount, vatRate, extras, opt, { info: info, areas: areas, totalArea: totalArea, prodArea: prodArea, mdfArea: mdfArea, consumption: consumption, lamellas: anyLamella ? lamellas : null, cp: cp, needsJoint: needsJoint, treads: treads, riserTreads: riserTreads, wastePct: wastePct, surchargeRaw: surchargeRaw });
     // rezerva na vstupy jde jen na lepidlo; na vinyl volitelně a jen v paušálním režimu (lamely z nářezového plánu jsou celé i s odřezky)
-    var vinylRes = d.reserveOnVinyl && !cp, vinylQty = consumption * (vinylRes ? res : 1);
-    var material = ln('material', 'Vinyl', vinylQty, 'm²', price,
-      (anyLamella && !usePct ? lamellas + ' lamel, ' : '') + 'prořez ' + String(Math.round(wastePct * 10) / 10).replace('.', ',') + ' %' + (vinylRes && d.reserve ? ', vč. rezervy' : ''));
+    var vinylRes = d.reserveOnVinyl && !cp, vinylQty = consumption * (vinylRes ? res : 1), mk = d.markup;
+    var material = ln('material', 'Vinyl', vinylQty, 'm²', mk ? price * mk.buy : price,
+      (anyLamella && !usePct ? lamellas + ' lamel, ' : '') + 'prořez ' + String(Math.round(wastePct * 10) / 10).replace('.', ',') + ' %' + (vinylRes && d.reserve ? ', vč. rezervy' : '') + (mk ? ', nákup ' + Math.round(mk.buy * 100) + ' % MOC' : ''));
     var mdf = ln('mdf', 'Podklad MDF', mdfArea, 'm²', d.mdfPerM2, 'z rozměrů dílců vč. rezervy na ořez'); // bez rezervy na vstupy – ořez je už v rozměrech
     var glueQty = (prodArea + (d.glueLayers === 2 ? mdfArea : 0)) * res;
     var glue = ln('glue', 'Lepidlo', glueQty, 'm²', d.gluePerM2, d.glueLayers + '× nános');
     var hourly = d.hourly === null ? 0 : d.hourly;
     var labor = ln('labor', 'Práce', hours, 'h', hourly);
-    var risers = ln('risers', 'Obklad podstupnic', riserCount * d.riserHours, 'h', hourly, riserCount + ' ks');
+    var risers = riserCount * d.riserHours > 0 ? ln('risers', 'Obklad podstupnic', riserCount * d.riserHours, 'h', hourly, riserCount + ' ks') : 0; // práce na podstupnici je v hodině za schod
     var runs = sideRuns(groups, opt.stairSide);
     var trimBm = isNaN(num(opt.trimBm)) ? runs.trimBm : num(opt.trimBm), edgeBm = isNaN(num(opt.edgeBm)) ? runs.edgeBm : num(opt.edgeBm);
-    var trim = trimBm > 0 ? ln('trim', 'Lišta KPV50', trimBm, 'bm', d.trimPerBm) : 0;
+    var trim = trimBm > 0 && (!mk || mk.trim) ? ln('trim', 'Lišta KPV50', trimBm, 'bm', d.trimPerBm) : 0;
     var edge = edgeBm > 0 ? ln('edge', 'Vinylová hrana', edgeBm, 'bm', d.edgePerBm === null ? 0 : d.edgePerBm) : 0;
-    var transport = ln('transport', 'Doprava', 1, 'paušál', n0(rates.transport));
+    var transport = n0(rates.transport) > 0 ? ln('transport', 'Doprava', 1, 'paušál', n0(rates.transport)) : 0; // doprava zdarma = bez řádku
     var treadTypes = roundTo(surchargeRaw, step);
     if (treadTypes) lines.push({ key: 'treadTypes', label: 'Příplatek za typ nášlapu', qty: 1, unit: 'ks', unitPrice: treadTypes, amount: treadTypes, sub: '' });
     var extrasTotal = roundTo(computeExtras(extras, rates), step);
@@ -331,7 +361,14 @@ var Calc = (function () {
     if (hours + riserCount * d.riserHours > 0 && d.hourly === null) missing.push('hodinová sazba práce');
     if (edgeBm > 0 && d.edgePerBm === null) missing.push('cena vinylové hrany');
     if (pat && !(price > 0)) missing.push('cena vinylu');
-    var subtotal = lines.reduce(function (s, l) { return s + l.amount; }, 0);
+    var subtotal = lines.reduce(function (s, l) { return s + l.amount; }, 0), production = subtotal;
+    if (mk && production > 0) { // přirážky se počítají z výrobní ceny
+      [['markupBuyer', 'Přirážka odběratel', mk.buyer], ['markupFloorer', 'Přirážka podlahář', mk.floorer], ['markupOurs', 'Naše marže', mk.ours]].forEach(function (m) {
+        var amount = roundTo(production * m[2] / 100, step);
+        if (amount) lines.push({ key: m[0], label: m[1], qty: m[2], unit: '%', unitPrice: 0, amount: amount, sub: 'z výroby ' + czk.format(production).replace(/ /g, ' ') });
+      });
+      subtotal = lines.reduce(function (s, l) { return s + l.amount; }, 0);
+    }
     var dsc = discount || { type: 'pct', value: 0 }, dv = n0(dsc.value);
     var discountAmount = dsc.type === 'czk' ? dv : subtotal * dv / 100;
     discountAmount = Math.min(subtotal, Math.max(0, roundTo(discountAmount, step)));
@@ -343,8 +380,63 @@ var Calc = (function () {
       autoTrimBm: runs.trimBm, autoEdgeBm: runs.edgeBm,
       treads: treads, riserTreads: riserTreads, wastePct: wastePct,
       material: material, labor: labor, mdf: mdf, glue: glue, laborM2: 0, risers: risers, treadTypes: treadTypes, transport: transport, extras: extrasTotal,
-      vinylInfo: { pct: d.vinylInfoPct, amount: roundTo(material * (1 - d.vinylInfoPct / 100), step) },
+      vinylInfo: mk ? null : { pct: d.vinylInfoPct, amount: roundTo(material * (1 - d.vinylInfoPct / 100), step) }, production: production,
       subtotal: subtotal, discountAmount: discountAmount, base: base, vat: vat, total: base + vat
+    };
+  }
+
+  /* Materiál výroby podestového schodu z našich sazeb (bez práce – normohodiny jsou otevřená otázka): čelo 2 × MDF 12 mm
+   * ve výšce 40 mm (s nosem) nebo výšce podstupnice (bez nosu); lepí se jen čelo (plocha MDF), plachta se nepodlepuje. Kč za kus. */
+  function landingMaterial(g, rates) {
+    var d = defaults(rates), lp = rates.landingPrice || {}, w = n0(g.width) / 100, dep = depthOf(g) / 100, nose = hasNose(g);
+    var h = nose ? n0(lp.noseEdgeMm) / 1000 : n0(g.riserHeight) / 100, mdf = w * h * (n0(lp.mdfLayers) || 2);
+    var glue = mdf * d.gluePerM2;
+    return { mdfM2: mdf, mdf: mdf * d.mdfPerM2, glue: glue, total: mdf * d.mdfPerM2 + glue, edgeH: h, lamellas: nose ? 1 : 2 };
+  }
+  function stairQuote(groups, pat, pricing, price, discount, vatRate, extras, opt, g0) {
+    var rates = pricing.rates, step = rates.roundTo || 1, d = defaults(rates), sr = stairRates(pricing, price), lines = [], missing = [];
+    function ln(key, label, qty, unit, unitPrice, sub) {
+      var amount = roundTo(qty * unitPrice, step);
+      lines.push({ key: key, label: label, qty: qty, unit: unit, unitPrice: unitPrice, amount: amount, sub: sub || '' });
+      return amount;
+    }
+    var lr = stairRates(pricing, price, 'landingPrice'), treadM2 = 0, riserM2 = 0, landM2 = 0, nStairs = 0, nLand = 0;
+    groups.forEach(function (g) {
+      var n = n0(g.count), a = n0(g.width) * depthOf(g) / 1e4 * n, land = isLanding(g) && lr;
+      if (land) { landM2 += a; nLand += n; } else { treadM2 += a; nStairs += n; }
+      // podesta bez nosu má čelo ve výšce podstupnice – podstupnice je v ceně podesty
+      if (g.coverRiser && !(land && !hasNose(g))) riserM2 += n0(g.width) * n0(g.riserHeight) / 1e4 * n;
+    });
+    var stairs = treadM2 > 0 ? ln('stairs', 'Schody (obklad nášlapů)', treadM2, 'm²', roundTo(sr.perM2, 1), nStairs + ' ks, z naměřené plochy') : 0;
+    var landings = landM2 > 0 ? ln('landings', 'Podestové schody (plachta)', landM2, 'm²', roundTo(lr.perM2, 1), nLand + ' ks, vč. čela') : 0;
+    var risers = riserM2 > 0 ? ln('risers', 'Podstupnice', riserM2, 'm²', roundTo(sr.riserPerM2, 1), g0.riserTreads + ' ks, ' + n0(sr.cfg.riserPct) + ' % ceny schodu za m²') : 0;
+    var runs = sideRuns(groups, opt.stairSide);
+    var trimBm = isNaN(num(opt.trimBm)) ? runs.trimBm : num(opt.trimBm), edgeBm = isNaN(num(opt.edgeBm)) ? runs.edgeBm : num(opt.edgeBm);
+    var trim = trimBm > 0 ? ln('trim', 'Lišta KPV50', trimBm, 'bm', d.trimPerBm) : 0;
+    var edge = edgeBm > 0 ? ln('edge', 'Vinylová hrana', edgeBm, 'bm', d.edgePerBm === null ? 0 : d.edgePerBm) : 0;
+    var transport = n0(rates.transport) > 0 ? ln('transport', 'Doprava', 1, 'paušál', n0(rates.transport)) : 0;
+    var treadTypes = roundTo(g0.surchargeRaw, step);
+    if (treadTypes) lines.push({ key: 'treadTypes', label: 'Příplatek za typ nášlapu', qty: 1, unit: 'ks', unitPrice: treadTypes, amount: treadTypes, sub: '' });
+    var extrasTotal = roundTo(computeExtras(extras, rates), step);
+    if (extrasTotal) lines.push({ key: 'extras', label: 'Volitelné příplatky', qty: 1, unit: 'ks', unitPrice: extrasTotal, amount: extrasTotal, sub: '' });
+    if (edgeBm > 0 && d.edgePerBm === null) missing.push('cena vinylové hrany');
+    if (pat && !(price > 0)) missing.push('cena vinylu');
+    var subtotal = lines.reduce(function (s, l) { return s + l.amount; }, 0);
+    var dsc = discount || { type: 'pct', value: 0 }, dv = n0(dsc.value);
+    var discountAmount = Math.min(subtotal, Math.max(0, roundTo(dsc.type === 'czk' ? dv : subtotal * dv / 100, step)));
+    var base = subtotal - discountAmount, vat = roundTo(base * vatRate, step);
+    // rozpis pro správce: kolik z ceny schodů a podstupnic je vinyl (MOC), naše výroba, podlahář a odběratel
+    var share = sr.stair > 0 ? (stairs + risers) / sr.stair : 0, vinylAmt = roundTo(g0.consumption * price, step), priced = stairs + risers + landings;
+    var production = roundTo(n0(sr.cfg.productionPerStair) * nStairs + (lr ? n0(lr.cfg.productionPerStair) * nLand : 0), step), floorer = roundTo(priced * n0(sr.cfg.floorerPct) / 100, step);
+    return {
+      legacy: false, stairMode: true, lines: lines, missing: missing, areas: g0.areas, totalArea: g0.totalArea, prodArea: g0.prodArea, mdfArea: g0.mdfArea,
+      groupsInfo: g0.info, needsJoint: g0.needsJoint, lamellas: g0.lamellas, cutPlan: g0.cp,
+      trim: { bm: trimBm, perBm: d.trimPerBm, amount: trim }, edge: { bm: edgeBm, perBm: d.edgePerBm, amount: edge },
+      autoTrimBm: runs.trimBm, autoEdgeBm: runs.edgeBm, treads: g0.treads, riserTreads: g0.riserTreads, wastePct: g0.wastePct,
+      material: 0, labor: 0, mdf: 0, glue: 0, laborM2: 0, risers: risers, treadTypes: treadTypes, transport: transport, extras: extrasTotal, vinylInfo: null,
+      stair: { perM2: sr.perM2, riserPerM2: sr.riserPerM2, refStair: sr.stair, treadM2: treadM2, riserM2: riserM2, landM2: landM2, landPerM2: lr ? lr.perM2 : null, stairs: stairs, risersAmount: risers, landings: landings,
+        split: { vinyl: vinylAmt, production: production, floorer: floorer, buyer: priced - vinylAmt - production - floorer }, share: share },
+      production: production, subtotal: subtotal, discountAmount: discountAmount, base: base, vat: vat, total: base + vat
     };
   }
 
@@ -386,7 +478,7 @@ var Calc = (function () {
     num: num, n0: n0, roundTo: roundTo, groupArea: groupArea, computeQuote: computeQuote,
     comparePatterns: comparePatterns, computeExtras: computeExtras, formatCZK: formatCZK, formatM2: formatM2,
     validateGroup: validateGroup, findPattern: findPattern, isSkewed: isSkewed, depthOf: depthOf, depthLabel: depthLabel,
-    isLegacy: isLegacy, collectionOf: collectionOf, patternPrice: patternPrice, patternOffered: patternOffered, pieceDims: pieceDims, lamellaUse: lamellaUse, cutPlan: cutPlan, sideRuns: sideRuns, defaults: defaults,
+    isLegacy: isLegacy, collectionOf: collectionOf, patternPrice: patternPrice, patternOffered: patternOffered, pieceDims: pieceDims, lamellaUse: lamellaUse, cutPlan: cutPlan, sideRuns: sideRuns, defaults: defaults, stairRates: stairRates, topVinylPrice: topVinylPrice, isLanding: isLanding, landingMaterial: landingMaterial,
     STAIR_TYPES: STAIR_TYPES, TREAD_TYPES: TREAD_TYPES, stairType: stairType, treadType: treadType, STEP_KINDS: STEP_KINDS, stepKind: stepKind, hasNose: hasNose, m2Rates: m2Rates
   };
 })();

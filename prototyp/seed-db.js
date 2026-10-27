@@ -5202,7 +5202,7 @@ var SEED_DB = {
   }
  ],
  "rates": {
-  "transport": 1500,
+  "transport": 0,
   "mdf": {
    "thicknessMm": 12,
    "eurPerM3": 375
@@ -5226,7 +5226,7 @@ var SEED_DB = {
     "nose": 1,
     "flat": 1
    },
-   "riserHours": 1
+   "riserHours": 0
   },
   "trimPerBm": 99,
   "edgePerBm": null,
