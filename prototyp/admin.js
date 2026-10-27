@@ -267,9 +267,10 @@
     var tt = Calc.TREAD_TYPES[0], tth = (lab.hoursByTread || {})[tt.id], hr = lab.hourly;
     var workEx = tth > 0 && hr > 0 ? ' Např. schod ' + tt.label.toLowerCase() + ': <b>' + nf2(tth).replace(/,00$/, '') + ' h × ' + nf2(hr).replace(/,00$/, '') + ' = ' + kcs(tth * hr) + '</b>.' : '';
     A.render(tabs('rates') + (miss.length ? '<div class="alert warn"><b>Cena není kompletní:</b> chybí ' + miss.join(', ') + '. Kalkulace tuto položku nezapočítá a ukáže upozornění.</div>' : '') +
-      ((r.stairPrice || {}).on ? '<div class="card"><b>Cena</b> = plocha nášlapů × cena schodu za m² + plocha podstupnic × cena podstupnice za m² + lišta + hrana + doprava − sleva, pak DPH. Cena schodu se odvozuje od nejdražšího dekoru (sekce Cena schodu). Sazby MDF, lepidla a práce níže se v tomto režimu nepoužívají. Uložené kalkulace drží svůj ceník.</div>'
+      ((r.costPrice || {}).on ? '<div class="card"><b>Cena schodu</b> = (vinyl za MOC + MDF + lepidlo) × (1 + prořez) + práce, celé × (1 + marže). K tomu lišta, hrana a doprava, pak sleva a DPH. Kalkulace může být i bez vinylu (jen MDF). Sekce Cena schodu a Podestový schod níže se v tomto režimu nepoužívají. Uložené kalkulace drží svůj ceník.</div>' : '') +
+      ((r.costPrice || {}).on ? '' : (r.stairPrice || {}).on ? '<div class="card"><b>Cena</b> = plocha nášlapů × cena schodu za m² + plocha podstupnic × cena podstupnice za m² + lišta + hrana + doprava − sleva, pak DPH. Cena schodu se odvozuje od nejdražšího dekoru (sekce Cena schodu). Sazby MDF, lepidla a práce níže se v tomto režimu nepoužívají. Uložené kalkulace drží svůj ceník.</div>'
         : '<div class="card"><b>Cena</b> = vinyl + MDF + lepidlo + práce + podstupnice + lišta + hrana + doprava (+ příplatek) − sleva, pak DPH. Každá položka se zaokrouhlí podle nastavení. Uložené kalkulace drží svůj ceník.</div>') +
-      '<form data-submit="saveRates" novalidate>' + stairSection(r) + landingSection(r) + '<div class="section-title">Obecné</div><div class="card">' +
+      '<form data-submit="saveRates" novalidate>' + costSection(r) + stairSection(r) + landingSection(r) + '<div class="section-title">Obecné</div><div class="card">' +
       field('transport', 'Doprava (Kč, paušál)', r.transport) +
       '<div class="field"><label for="vd">Výchozí DPH</label><select id="vd" name="vatDefault">' + r.vatOptions.map(function (v) { return '<option value="' + v + '"' + (v === r.vatDefault ? ' selected' : '') + '>' + Math.round(v * 100) + ' %</option>'; }).join('') + '</select><div class="hint">Na kalkulaci lze přepnout 21 % / 12 %.</div></div>' +
       '<div class="field" style="margin:0"><label for="rt">Zaokrouhlení</label><select id="rt" name="roundTo"><option value="1"' + (r.roundTo === 1 ? ' selected' : '') + '>na celé Kč</option><option value="10"' + (r.roundTo === 10 ? ' selected' : '') + '>na 10 Kč (ukázka)</option></select></div>' + how('Doprava se připočte jednou za kalkulaci. Sleva se odečte před DPH.') + '</div>' +
@@ -300,6 +301,22 @@
       '<button class="btn primary block" type="submit">Uložit sazby</button></form>' +
       '<div class="section-title">Demo data</div><div class="card"><p class="small muted">Vrátí ceník, uživatele i kalkulace na původní ukázková data.</p><button class="btn danger block" data-click="resetDemo">' + ic('refresh') + 'Obnovit ukázková data</button></div>', { title: 'Správa' });
   });
+  /* Cena schodu z materiálu: prořez, práce na schod, marže a příklad referenčního schodu s nejdražším vinylem */
+  function costSection(r) {
+    var cp = r.costPrice || {}, kc = function (x) { return kcs(Math.round(x)); };
+    var h = '<div class="section-title">Cena schodu z materiálu</div><div class="card">' + check('cpOn', 'Počítat cenu schodu z materiálu, práce a marže (má přednost před cenou od nejdražšího dekoru)', cp.on !== false) +
+      '<div class="group-grid">' + field('cpWaste', 'Prořez materiálu (%)', cp.wastePct) + field('cpMargin', 'Marže z celku (%)', cp.marginPct) + '</div>' +
+      '<div class="group-grid">' + field('cpHours', 'Práce na schod (h)', cp.hoursPerStair) + field('cpHourly', 'Sazba práce (Kč/h)', cp.hourly) + '</div>';
+    var pr = { patterns: Store.db.patterns, collections: Store.db.collections, rates: Object.assign({}, r, { costPrice: Object.assign({}, cp, { on: true }) }) }, top = Calc.topVinylPrice(pr);
+    var g = { width: 120, depth: 33, riserHeight: 18, count: 1, treadType: 'nose', stepKind: 'straight', coverRiser: false };
+    var pat = Store.db.patterns.filter(function (p) { return Calc.patternOffered(pr, p) && Calc.patternPrice(pr, p) === top; })[0];
+    if (pat) {
+      var q = Calc.computeQuote([g], pat.id, pr, null, 0, {}, {}), s = q.cost.split, q0 = Calc.computeQuote([g], pat.id, pr, null, 0, {}, { noVinyl: true });
+      h += how('<b>Příklad:</b> schod 120 × 33 cm s nosem bez podstupnice, nejdražší vinyl ' + kc(top) + '/m². Materiál ' + kc(s.vinyl + s.mdf + s.glue) + ' (vinyl ' + kc(s.vinyl) + ', MDF ' + kc(s.mdf) + ', lepidlo ' + kc(s.glue) + ') + prořez ' + kc(s.waste) +
+        ' + práce ' + kc(s.labor) + ' + marže ' + kc(s.margin) + ' = <b>' + kc(q.cost.priced) + '</b> bez DPH. Bez vinylu <b>' + kc(q0.cost.priced) + '</b>.');
+    }
+    return h + '</div>';
+  }
   /* Cena schodu od nejdražšího dekoru: nastavení, rozpis referenčního schodu, cena za m² a tabulka kolekcí */
   function stairSection(r) {
     var sp = r.stairPrice || {}, pr = { patterns: Store.db.patterns, collections: Store.db.collections, rates: r }, sr = Calc.stairRates(pr);
@@ -371,6 +388,10 @@
     ['lpTop', 'lpW', 'lpD', 'lpProd', 'lpFloor', 'lpNose', 'lpWaste'].forEach(function (k) { var bad = !(num(e[k]) >= 0); A.setErr(e[k], bad ? 'Zadejte číslo ≥ 0' : ''); if (bad) lpBad = true; });
     if (lpBad) return;
     r.landingPrice = { on: e.lpOn.checked, topPrice: num(e.lpTop), refWidthMm: num(e.lpW), refDepthMm: num(e.lpD), productionPerStair: num(e.lpProd), floorerPct: num(e.lpFloor), wastePct: num(e.lpWaste), noseEdgeMm: num(e.lpNose), mdfLayers: 2 };
+    var cpBad = false;
+    ['cpWaste', 'cpMargin', 'cpHours', 'cpHourly'].forEach(function (k) { var bad = !(num(e[k]) >= 0); A.setErr(e[k], bad ? 'Zadejte číslo ≥ 0' : ''); if (bad) cpBad = true; });
+    if (cpBad) return;
+    r.costPrice = { on: e.cpOn.checked, wastePct: num(e.cpWaste), hoursPerStair: num(e.cpHours), hourly: num(e.cpHourly), marginPct: num(e.cpMargin) };
     r.stairPrice = { on: e.spOn.checked, topPrice: num(e.spTop), refWidthMm: num(e.spW), refDepthMm: num(e.spD), productionPerStair: num(e.spProd), floorerPct: num(e.spFloor), riserPct: num(e.spRiser), wastePct: num(e.spWaste) };
     Store.save(); A.toast('Sazby uloženy'); A.dispatch();
   });

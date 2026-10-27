@@ -5278,7 +5278,7 @@ var SEED_DB = {
     }
    }
   },
-  "vatDefault": 0.21,
+  "vatDefault": 0.12,
   "vatOptions": [
    0.21,
    0.12

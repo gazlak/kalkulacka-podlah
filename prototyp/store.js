@@ -18,7 +18,7 @@ var Store = (function () {
     return d;
   }
   function seed() {
-    if (typeof SEED_DB !== 'undefined') { var sd = clone(SEED_DB); sd.tokens = {}; sd.seedVersion = SEED_VERSION; if (sd.rates && sd.rates.markup === undefined) sd.rates.markup = clone(DEFAULTS.rates.markup); if (sd.rates && sd.rates.stairPrice === undefined) sd.rates.stairPrice = clone(DEFAULTS.rates.stairPrice); if (sd.rates && sd.rates.landingPrice === undefined) sd.rates.landingPrice = clone(DEFAULTS.rates.landingPrice); return demoViz(sd); }
+    if (typeof SEED_DB !== 'undefined') { var sd = clone(SEED_DB); sd.tokens = {}; sd.seedVersion = SEED_VERSION; if (sd.rates && sd.rates.markup === undefined) sd.rates.markup = clone(DEFAULTS.rates.markup); if (sd.rates && sd.rates.stairPrice === undefined) sd.rates.stairPrice = clone(DEFAULTS.rates.stairPrice); if (sd.rates && sd.rates.costPrice === undefined) sd.rates.costPrice = clone(DEFAULTS.rates.costPrice); if (sd.rates && sd.rates.landingPrice === undefined) sd.rates.landingPrice = clone(DEFAULTS.rates.landingPrice); return demoViz(sd); }
     var d = {
       patterns: clone(DEFAULTS.patterns),
       collections: clone(DEFAULTS.collections),
@@ -95,6 +95,8 @@ var Store = (function () {
     var out = loadLocal(), dirty = !shared;
     // nový ceník (cena schodu od nejdražšího dekoru, 27. 10.): všechny kalkulace se jednou přepočítají podle aktuálního ceníku
     if (!db.stairPrice27) { db.stairPrice27 = 1; db.calculations.forEach(function (c) { if (c.snapshot) c.snapshot = snapshotFor(c.patternId); }); dirty = true; }
+    // cena schodu z materiálu (27. 10.): všechny kalkulace se jednou přepočítají podle aktuálního ceníku
+    if (!db.costPrice27) { db.costPrice27 = 1; if (db.rates.costPrice === undefined) db.rates.costPrice = clone(DEFAULTS.rates.costPrice); db.calculations.forEach(function (c) { if (c.snapshot) c.snapshot = snapshotFor(c.patternId); }); dirty = true; }
     if (dirty) save();
     return db;
   }
@@ -118,6 +120,12 @@ var Store = (function () {
       // cena schodu od nejdražšího dekoru (podle ceníku AKTO) přibyla 27. 10. – doplní se jednou
       if (db.rates.stairPrice === undefined) { db.rates.stairPrice = clone(DEFAULTS.rates.stairPrice); save(); }
       if (db.rates.landingPrice === undefined) { db.rates.landingPrice = clone(DEFAULTS.rates.landingPrice); save(); }
+      // cena schodu z materiálu + 10 % + práce + marže 50 % přibyla 27. 10. – doplní se jednou
+      // výchozí DPH 12 % (27. 10.) – nastaví se jednou; uložené kalkulace drží svou sazbu, pozdější změna v Sazbách zůstane
+      if (!db.vat12) { db.vat12 = 1; db.rates.vatDefault = 0.12; save(); }
+      // DPH 12 % i u všech už uložených kalkulací (27. 10., jednou)
+      if (!db.vat12calc) { db.vat12calc = 1; db.calculations.forEach(function (c) { c.vatRate = 0.12; }); save(); }
+      if (db.rates.costPrice === undefined) { db.rates.costPrice = clone(DEFAULTS.rates.costPrice); save(); }
       // výchozí hodinová sazba 400 Kč/h se doplní jednou; pozdější vymazání v Sazbách zůstane platné
       if (!db.hourly400) { db.hourly400 = 1; if (db.rates.labor && db.rates.labor.hourly === null) db.rates.labor.hourly = 400; save(); }
       if (db.rates.allowance && (db.rates.allowance.depth || db.rates.allowance.riser)) { db.rates.allowance.depth = 0; db.rates.allowance.riser = 0; save(); }

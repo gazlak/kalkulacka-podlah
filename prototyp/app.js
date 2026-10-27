@@ -20,7 +20,7 @@ var App = (function () {
   A.patternImg = function (p) { return p.photo || Textures.uri(p.texture, p.tint); };
   A.pricingOf = function (c) { return c.snapshot || Store.currentPricing(); };
   // volby kalkulace pro novou cestu výpočtu (strana ke zdi / otevřená, ruční bm lišty a hrany, formát dlaždice)
-  A.quoteOpt = function (c) { return { stairSide: c.stairSide, trimBm: c.trimBm, edgeBm: c.edgeBm, formatId: c.formatId }; };
+  A.quoteOpt = function (c) { return { stairSide: c.stairSide, trimBm: c.trimBm, edgeBm: c.edgeBm, formatId: c.formatId, noVinyl: !!c.noVinyl }; };
   A.quoteOf = function (c) {
     return Calc.computeQuote(c.groups, c.patternId, A.pricingOf(c), c.discount, c.vatRate, c.extras, A.quoteOpt(c));
   };

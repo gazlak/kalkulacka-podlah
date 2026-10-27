@@ -58,6 +58,9 @@ var DEFAULTS = {
     stairPrice: { on: true, topPrice: 3500, refWidthMm: 1200, refDepthMm: 330, riserPct: 80, productionPerStair: 1000, floorerPct: 30, wastePct: 10 },
     // podestový schod (plachta): vinyl přímo na podestu, horní MDF není; čelo 2 × MDF 12 mm (s nosem výška 40 mm a 1 lamela,
     // bez nosu výška podle podstupnice a 2 lamely – podstupnice je tím v ceně). Referenční podesta s nejdražším vinylem = topPrice.
+    // cena schodu z materiálu (má přednost před cenou od nejdražšího dekoru): (vinyl za MOC + MDF + lepidlo) × (1 + prořez %)
+    // + práce hoursPerStair × hourly, celé × (1 + marže %); kalkulace může být i bez vinylu (jen MDF)
+    costPrice: { on: true, wastePct: 10, hoursPerStair: 0.5, hourly: 600, marginPct: 50 },
     landingPrice: { on: true, topPrice: 3000, refWidthMm: 1200, refDepthMm: 1000, productionPerStair: 800, floorerPct: 30, wastePct: 10, noseEdgeMm: 40, mdfLayers: 2 },
     allowance: { width: 3, depth: 0, riser: 0 },  // starý přídavek – jen pro uložené kalkulace bez cut a cutMargin
     nose: { mdfOverhangMm: 0, mdfWrapMm: 0, vinylOverhangMm: 0, vinylWrapMm: 0 },
@@ -73,7 +76,7 @@ var DEFAULTS = {
         nose: { mdfMm: 12, glue: 0, labor: 0 }, flat: { mdfMm: 12, glue: 0, labor: 0 }
       }
     },
-    vatDefault: 0.21, vatOptions: [0.21, 0.12], roundTo: 1,
+    vatDefault: 0.12, vatOptions: [0.21, 0.12], roundTo: 1,
     extrasEnabled: false,
     extras: []  // volitelné příplatky (demontáž, vyrovnání) zrušeny
   },

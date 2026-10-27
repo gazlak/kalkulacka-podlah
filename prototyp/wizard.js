@@ -374,8 +374,16 @@
   }
   function stepPattern(c) {
     return '<h1 class="wiz-title">Vzor obkladu</h1><p class="lead-text">Cena u vzoru je orientační celek s DPH pro vaše schody.' + (c.snapshot ? ' Uložená kalkulace nabízí vzory své kolekce; jiné se nabídnou po přepočtu podle aktuálního ceníku.' : '') + '</p>' +
-      viewCard(c) + '<div id="patFilters">' + patFilters(c) + '</div><div id="fmtBox">' + formatSwitch(c) + '</div><div id="patTiles">' + patTiles(c) + '</div><div class="err" id="patErr" role="alert"></div>' + A.question('photos');
+      viewCard(c) + vinylSwitch(c) + '<div id="patFilters">' + patFilters(c) + '</div><div id="fmtBox">' + formatSwitch(c) + '</div><div id="patTiles">' + patTiles(c) + '</div><div class="err" id="patErr" role="alert"></div>' + A.question('photos');
   }
+  // schody s vinylem, nebo bez vinylu (jen MDF) – jen v ceně z materiálu
+  function vinylSwitch(c) {
+    if (!(A.pricingOf(c).rates.costPrice || {}).on) return '';
+    return '<div class="seg full" role="group" aria-label="Vinyl" style="margin-bottom:12px">' + [[false, 'S vinylem'], [true, 'Bez vinylu (jen MDF)']].map(function (o) {
+      return '<button type="button" data-click="noVinyl" data-v="' + (o[0] ? 1 : 0) + '" aria-pressed="' + (!!c.noVinyl === o[0]) + '" class="' + (!!c.noVinyl === o[0] ? 'on' : '') + '"' + (ro(c) ? ' disabled' : '') + '>' + o[1] + '</button>';
+    }).join('') + '</div>';
+  }
+  A.on('click', 'noVinyl', function (el) { if (ro()) return; W.c.noVinyl = el.dataset.v === '1'; touch(W.c); A.dispatch(); });
   // dlaždice Design Stone mají víc formátů téže kolekce; volba platí pro celou kalkulaci
   function formatSwitch(c) {
     var pr = A.pricingOf(c), pat = c.patternId ? Calc.findPattern(pr, c.patternId) : null, coll = pat && Calc.collectionOf(pr, pat, null);
@@ -546,6 +554,11 @@
     if (q.stairMode && full()) { var sp = q.stair.split;
       h += lr('<span class="muted">Z toho vinyl (MOC)</span>', '', '<span class="muted">' + fmt(sp.vinyl) + '</span>') + lr('<span class="muted">Naše výroba</span>', q.treads + ' schodů', '<span class="muted">' + fmt(sp.production) + '</span>') +
         lr('<span class="muted">Podlahář</span>', Calc.n0(r.stairPrice.floorerPct) + ' %', '<span class="muted">' + fmt(sp.floorer) + '</span>') + lr('<span class="muted">Odběratel</span>', 'zbytek', '<span class="muted">' + fmt(sp.buyer) + '</span>'); }
+    if (q.costMode && full()) { var cs = q.cost.split, cf = q.cost.cfg;
+      h += (q.noVinyl ? '' : lr('<span class="muted">Z toho vinyl (MOC)</span>', '', '<span class="muted">' + fmt(cs.vinyl) + '</span>')) + lr('<span class="muted">MDF a lepidlo</span>', '', '<span class="muted">' + fmt(cs.mdf + cs.glue) + '</span>') +
+        lr('<span class="muted">Prořez materiálu</span>', Calc.n0(cf.wastePct) + ' %', '<span class="muted">' + fmt(cs.waste) + '</span>') +
+        lr('<span class="muted">Práce</span>', (q.cost.stairs + q.cost.landings) + ' × ' + nf.format(Calc.n0(cf.hoursPerStair)) + ' h × ' + fmt(cf.hourly), '<span class="muted">' + fmt(cs.labor) + '</span>') +
+        lr('<span class="muted">Marže</span>', Calc.n0(cf.marginPct) + ' %', '<span class="muted">' + fmt(cs.margin) + '</span>'); }
     if (q.discountAmount > 0) h += lr('Mezisoučet', '', fmt(q.subtotal)) + lr('Sleva', c.discount.type === 'pct' ? Calc.n0(c.discount.value) + ' %' : '', '− ' + fmt(q.discountAmount), 'minus');
     h += lr('Cena bez DPH', '', fmt(q.base), 'tot') + lr('DPH ' + pct(c.vatRate), '', fmt(q.vat)) + lr('Celkem s DPH', r.roundTo > 1 ? 'zaokrouhleno na ' + r.roundTo + ' Kč' : '', fmt(q.total), 'tot') + '</div>';
     return h;
@@ -709,7 +722,7 @@
     var pr = A.pricingOf(c);
     var top = heroCard(c) + actionGrid(c, false) + priceNotice(c) + (c.number ? '' : '<div class="alert info">Kalkulace zatím není uložena. Číslo bude přiděleno při uložení a ceník se „zamkne“.</div>');
     var main = '<div class="section-title">Schody</div>' + stepStairs(c, true) + '<div id="stairRows">' + stairsList(c) + '</div>' +
-      '<div class="section-title">Vzor</div><div id="patPreview">' + patPreview(c) + '</div>' +
+      '<div class="section-title">Vzor</div>' + vinylSwitch(c) + '<div id="patPreview">' + patPreview(c) + '</div>' +
       '<details class="fold-card list" id="patPick"' + (c.patternId ? '' : ' open') + '><summary><span>Změnit vzor</span>' + ic('chev-d') + '</summary><div class="pad">' +
       '<div id="patFilters">' + patFilters(c) + '</div><div id="fmtBox">' + formatSwitch(c) + '</div><div id="patTiles">' + patTiles(c) + '</div></div></details>' +
       '<div class="err" id="patErr" role="alert"></div>' + viewCard(c) +
