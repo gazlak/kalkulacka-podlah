@@ -1,7 +1,8 @@
 /* Průvodce (kroky 1–5), obrazovka kalkulace, PDF náhled, odeslání e-mailem, porovnání vzorů. */
 (function () {
   var A = App, esc = A.esc, fmt = Calc.formatCZK, m2 = Calc.formatM2, ic = A.icon;
-  var W = { pending: null, c: null, step: 1, showErrors: false, inWizard: false, folded: {}, foldFor: null, verFor: null, verBase: null, verPending: false };
+  var PAT_PAGE = 24;
+  var W = { patLimit: PAT_PAGE, pending: null, c: null, step: 1, showErrors: false, inWizard: false, folded: {}, foldFor: null, verFor: null, verBase: null, verPending: false };
 
   /* ---------- společné ---------- */
   function loadCalc(id, user) {
@@ -95,7 +96,7 @@
     for (var i = 1; i < s; i++) if (Object.keys(stepErrors(c, i)).length) { W.showErrors = true; return A.go('/wizard/' + c.id + '/' + i); }
     W.c = c; W.step = s; W.inWizard = true;
     if (W.foldFor !== c.id) { W.folded = {}; W.foldFor = c.id; }
-    var saved = Store.calcById(c.id) ? (c.number ? 'Změny uloženy ' : 'Koncept uložen ') + A.fmtTime(c.updatedAt) : 'Zatím neuloženo';
+    var saved = Store.calcById(c.id) ? 'Uloženo ' + A.fmtTime(c.updatedAt) : 'Neuloženo';
     var head = '<div class="wiz-head"><div class="t"><span>Krok ' + s + ' z 5 · <b>' + LABELS[s - 1] + '</b></span></div>' +
       '<div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="5" aria-valuenow="' + s + '" aria-label="Postup"><i style="width:' + (s * 20) + '%"></i></div></div>';
     var body = s === 1 ? stepPhotos(c) : s === 2 ? stepStairs(c) : s === 3 ? stepPattern(c) : s === 4 ? stepJob(c) : calcBody(c, true);
@@ -144,7 +145,7 @@
     var c = W.c, info = A.$('#barInfo'), pr = A.$('#barPrice'); if (!info) return;
     var q = A.quoteOf(c), pat = c.patternId ? Calc.findPattern(A.pricingOf(c), c.patternId) : null;
     info.textContent = m2(q.totalArea) + (pat ? ' · ' + pat.name : ' · vzor zatím nevybrán');
-    pr.textContent = pat ? fmt(q.total) : '—';
+    pr.textContent = pat ? fmt(q.total) : ''; pr.parentNode.hidden = !pat;
   }
 
   function showStepErrors(c, s) {
@@ -256,7 +257,7 @@
       '<div class="gbody"><div class="hint dim-hint">' + DIM_HINT + '</div><div class="group-grid">' + fld('width', 'Největší délka', 'cm', 'decimal') + fld('depth', 'Hloubka', 'cm', 'decimal') + fld('riserHeight', 'Výška podstupnice', 'cm', 'decimal') +
       '</div>' +
       // podstupnice se obkládá vždy, volba se proto nenabízí
-      '<div class="field"><span class="lbl">Typ schodu</span><div class="seg full" role="group" aria-label="Typ schodu ' + (i + 1) + '">' +
+      '<div class="field"><span class="lbl">Typ schodu</span><div class="seg full wrap three" role="group" aria-label="Typ schodu ' + (i + 1) + '">' +
       Calc.STEP_KINDS.map(function (k) { return '<button type="button" data-click="stepKind" data-g="' + i + '" data-k="' + k.id + '" class="' + (Calc.stepKind(g).id === k.id ? 'on' : '') + '">' + k.label + '</button>'; }).join('') + '</div>' + (i === 0 ? A.question('stepKindPrice') : '') + '</div>' +
       '<div class="field"><span class="lbl">Strana</span><div class="seg full wrap" role="group" aria-label="Strana skupiny ' + (i + 1) + '">' + SIDES.map(function (x) {
         return '<button type="button" data-click="gside" data-g="' + i + '" data-s="' + x[0] + '" class="' + (g.side === x[0] ? 'on' : '') + '">' + x[1] + '</button>';
@@ -353,13 +354,13 @@
     var min = priced.length > 1 && Math.max.apply(null, priced) > Math.min.apply(null, priced) ? Math.min.apply(null, priced) : null; // při stejných cenách bez štítku
     if (!list.length) return '<p class="muted small">Žádný vzor neodpovídá filtru.</p>';
     return '<p class="small muted pat-count">' + list.length + ' z ' + pr.patterns.filter(function (p) { return Calc.patternOffered(pr, p); }).length + ' vzorů</p><div class="tiles" role="radiogroup" aria-label="Vzor">' +
-      list.map(function (p, i) {
+      list.slice(0, W.patLimit).map(function (p, i) {
         var sel = c.patternId === p.id, q = cmp && priceOf(c, p) > 0 ? cmp[i].quote : null;
         return '<label class="tile' + (sel ? ' selected' : '') + '"><input type="radio" name="pattern" value="' + p.id + '" data-change="pickPattern"' + (sel ? ' checked' : '') + '>' +
           '<div style="position:relative"><img loading="lazy" src="' + A.patternImg(p) + '" alt="' + esc(p.name) + '">' + (q && q.total === min ? '<span class="ov">Nejlevnější</span>' : '') + '<span class="tick">' + ic('check') + '</span></div>' +
           '<div class="t"><b>' + esc(p.name) + '</b>' + (full() ? '<span class="small muted">' + patPrice(p, c) + '</span>' : '') +
           (q ? '<div class="tot"><b>' + fmt(q.total) + '</b> <span class="muted">s DPH</span></div>' + (q.needsJoint ? JOINT : '') : '') + '</div></label>';
-      }).join('') + '</div>';
+      }).join('') + '</div>' + (list.length > W.patLimit ? '<button type="button" class="btn block mt" data-click="patMore">Zobrazit další (' + (list.length - W.patLimit) + ')</button>' : '');
   }
   function patFilters(c) {
     var pr = A.pricingOf(c), f = patFilter(c), kols = [];
@@ -395,9 +396,10 @@
   }
   A.on('click', 'fmt', function (el) { W.c.formatId = el.dataset.f; touch(W.c); A.$('#fmtBox').innerHTML = formatSwitch(W.c); patRefresh(false); refreshAll(); });
   function patRefresh(all) { if (all) A.$('#patFilters').innerHTML = patFilters(W.c); A.$('#patTiles').innerHTML = patTiles(W.c); }
-  A.on('click', 'patTyp', function (el) { W.pf.typ = el.dataset.t; W.pf.kol = ''; patRefresh(true); });
-  A.on('change', 'patSel', function (el) { W.pf[el.dataset.k] = el.value; patRefresh(false); });
-  A.on('input', 'patQ', function (el) { W.pf.q = el.value; patRefresh(false); });
+  A.on('click', 'patTyp', function (el) { W.pf.typ = el.dataset.t; W.pf.kol = ''; W.patLimit = PAT_PAGE; patRefresh(true); });
+  A.on('click', 'patMore', function () { W.patLimit += PAT_PAGE; patRefresh(false); });
+  A.on('change', 'patSel', function (el) { W.pf[el.dataset.k] = el.value; W.patLimit = PAT_PAGE; patRefresh(false); });
+  A.on('input', 'patQ', function (el) { W.pf.q = el.value; W.patLimit = PAT_PAGE; patRefresh(false); });
   A.on('change', 'pickPattern', function (el) {
     W.c.patternId = +el.value;
     var pr = A.pricingOf(W.c), coll = Calc.collectionOf(pr, Calc.findPattern(pr, W.c.patternId), null);
@@ -504,7 +506,7 @@
       }).join('') + '</div>' + A.question('vat') + '</div>';
   }
   function heroPrice(c) {
-    if (!canPrice(c)) return '<div class="big">—</div><div class="sub">' + (c.patternId ? 'Doplňte rozměry schodů' : 'Vyberte vzor') + '</div>';
+    if (!canPrice(c)) return '<div class="big big-empty">' + (c.patternId ? 'Doplňte rozměry schodů' : 'Cena po výběru vzoru') + '</div>';
     var q = A.quoteOf(c), r = A.pricingOf(c).rates;
     if (!full()) return '<div class="big">' + fmt(q.total) + '</div>';
     return '<div class="big">' + fmt(q.total) + '</div><div class="sub">bez DPH ' + fmt(q.base) + ' · DPH ' + pct(c.vatRate) + ' ' + fmt(q.vat) + (r.roundTo > 1 ? ' · zaokrouhleno na ' + r.roundTo + ' Kč' : '') + '</div>';
@@ -634,7 +636,7 @@
     if (!full()) {
       if (inWizard) return '';
       if (!ro(c)) return '<div class="btn-grid mb no-print"><button class="btn primary" style="grid-column:1/-1" data-click="handover">Odeslat ke zpracování</button>' + edit + dup + '</div>';
-      return '<div class="alert info no-print">' + STATUS_INFO[c.status] + '</div><div class="btn-grid mb no-print">' + dup + '</div>';
+      return '<div class="alert info no-print">' + STATUS_INFO[c.status] + '</div>';
     }
     var h = '<div class="btn-grid mb no-print"><button class="btn" data-click="pdf">' + ic('pdf') + 'PDF</button><button class="btn" data-click="mail">' + ic('mail') + 'Odeslat</button>' +
       '<button class="btn" data-click="vyroba">' + ic('print') + 'Do výroby</button>';
@@ -731,7 +733,7 @@
       cutCard(c, A.quoteOf(c)) + trimCard(c, A.quoteOf(c)) + discountCard(c, pr);
     var rest = '<div class="section-title">Rozpis ceny</div><div id="sums">' + sums(c) + '</div>' + statusCard(c) + A.question('labor') + A.question('laborHours') + (c.number ? A.question('editPrices') : '');
     var bar = '<div class="actionbar stickybar"><div class="inner">' + priceRow() + '<div class="btns">' + backBtn('#/history') + '<button class="btn sq" data-click="moreSheet" aria-label="Další akce">' + ic('more', 'lg') + '</button><button class="btn primary" data-click="saveCalc">Uložit</button></div></div></div>';
-    var saved = Store.calcById(c.id) ? (c.number ? 'Změny uloženy ' : 'Koncept uložen ') + A.fmtTime(c.updatedAt) : 'Zatím neuloženo';
+    var saved = Store.calcById(c.id) ? 'Uloženo ' + A.fmtTime(c.updatedAt) : 'Neuloženo';
     A.render('<div class="adm-grid" id="adm"><div class="adm-main">' + main + '</div><div class="adm-side"><div class="adm-top">' + top + '</div><div class="adm-rest">' + rest + '</div></div></div>',
       { wide: true, title: 'Kalkulace ' + (c.number || '(koncept)'), back: '#/history', saved: saved, bar: bar });
     barUpdate();
@@ -745,7 +747,7 @@
     if (!allValid(c)) return A.go('/wizard/' + c.id + '/1');
     W.c = c; W.step = 5;
     var body = calcBody(c, false), bar;
-    if (!full()) bar = '<div class="actionbar stickybar"><div class="inner">' + priceRow() + '<div class="btns">' + backBtn('#/history') + (ro(c) ? '' : '<button class="btn primary" data-click="handover">Odeslat ke zpracování</button>') + '</div></div></div>';
+    if (!full()) bar = '<div class="actionbar stickybar"><div class="inner">' + priceRow() + '<div class="btns">' + (ro(c) ? '' : backBtn('#/history')) + (ro(c) ? '<button class="btn primary" data-click="dup">' + ic('copy') + 'Duplikovat</button>' : '<button class="btn primary" data-click="handover">Odeslat ke zpracování</button>') + '</div></div></div>';
     else bar = '<div class="actionbar stickybar"><div class="inner">' + priceRow() + '<div class="btns">' + backBtn('#/history') + '<button class="btn sq" data-click="moreSheet" aria-label="Další akce">' + ic('more', 'lg') + '</button><button class="btn primary" data-click="saveCalc">Uložit změny</button></div></div></div>';
     A.render(body, { title: 'Kalkulace ' + (c.number || '(koncept)'), back: '#/history', bar: bar });
     barUpdate();

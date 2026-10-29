@@ -199,6 +199,11 @@ var App = (function () {
     renderChrome(user, opts);
     window.scrollTo(0, 0);
   };
+  A.measureBar = function () {
+    var bar = document.querySelector('#barHost .actionbar');
+    document.documentElement.style.setProperty('--bar-h', bar ? bar.offsetHeight + 'px' : '0px');
+  };
+  window.addEventListener('resize', function () { A.measureBar(); });
   function renderChrome(user, opts) {
     var top = document.getElementById('topbar'), tabs = document.getElementById('tabbar'), host = document.getElementById('barHost'), b = document.body;
     var show = !!user && !opts.bare;
@@ -207,8 +212,9 @@ var App = (function () {
     b.classList.toggle('has-tabs', show && !opts.bar);
     tabs.hidden = !(show && !opts.bar);
     host.innerHTML = show && opts.bar ? opts.bar : '';
+    A.measureBar();
     if (!show) { top.innerHTML = ''; tabs.innerHTML = ''; return; }
-    top.innerHTML = (opts.back ? '<a class="icon-btn" href="' + opts.back + '" aria-label="Zpět">' + A.icon('back', 'lg') + '</a>' : '') +
+    top.innerHTML = (opts.back ? '<a class="icon-btn" href="' + opts.back + '" aria-label="Zpět">' + A.icon('back', 'lg') + '</a>' : '<img class="brand-logo" src="img/kprodukt-logo.png" alt="K-Produkt">') +
       '<div class="tt' + (opts.back ? ' has-back' : '') + '">' + esc(opts.title || 'Kalkulačka schodů') + '</div>' +
       (opts.saved !== undefined ? '<span class="saved-ind" id="savedInd">' + esc(opts.saved) + '</span>' : '') + (opts.action || '');
     function tab(h, ic, label, cls, on) {
@@ -287,7 +293,7 @@ var App = (function () {
     return ok;
   }
   function authBrand(title, sub) {
-    return '<div class="auth-brand"><div class="logo-mark">' + A.icon('stairs') + '</div><div><h1>' + esc(title) + '</h1>' + (sub ? '<p>' + sub + '</p>' : '') + '</div></div>';
+    return '<div class="auth-brand"><img class="brand-logo" src="img/kprodukt-logo.png" alt="K-Produkt"><div><h1>' + esc(title) + '</h1>' + (sub ? '<p>' + sub + '</p>' : '') + '</div></div>';
   }
 
   /* ---------- přihlášení ---------- */
@@ -521,9 +527,9 @@ var App = (function () {
       var edit = canEdit && !adm ? '<a class="hist-edit" href="#/wizard/' + c.id + '/1">' + A.icon('edit', 'sm') + 'Upravit</a>' : '';
       return '<div class="hist-card"><div class="top"><div><a class="name hist-link" href="' + href + '">' + esc(c.job.name || 'Bez názvu') + '</a>' +
         '<div class="small muted">' + esc(c.job.customer || 'bez zákazníka') + ' · ' + A.fmtDate(c.updatedAt) + '</div></div>' +
-        '<div class="price">' + (x.total === null ? '—' : fmt(x.total)) + '</div></div>' +
+        '<div class="price' + (x.total === null ? ' muted' : '') + '">' + (x.total === null ? 'bez ceny' : fmt(x.total)) + '</div></div>' +
         (user.role === 'admin' && c.ownerId !== user.id ? '<div class="who">' + A.icon('user', 'sm') + esc(ownerName(c)) + '</div>' : '') +
-        '<div class="foot"><span class="dot st-' + c.status + '">' + A.statusLabel(c.status) + '</span><span class="end"><span>' + (c.number ? 'č. ' + esc(c.number) : 'rozpracováno') + '</span>' + edit + '</span></div></div>';
+        '<div class="foot"><span class="dot st-' + c.status + '">' + A.statusLabel(c.status) + '</span><span class="end"><span>' + (c.number ? 'č. ' + esc(c.number) : edit ? '' : 'rozpracováno') + '</span>' + edit + '</span></div></div>';
     }).join('');
     A.$('#hlist').innerHTML = html || '<div class="empty"><svg class="ic art" aria-hidden="true"><use href="#i-inbox"/></svg>' + (all.length ? '<p>Nic nenalezeno.<br>Zkuste upravit hledání nebo filtr.</p>' : '<p>Zatím nemáte žádnou kalkulaci.</p><a class="btn primary" href="#/new">' + A.icon('plus') + 'Vytvořit první kalkulaci</a>') + '</div>';
   }
@@ -564,6 +570,134 @@ var App = (function () {
     if (!Store.save()) return A.toast('Uložení se nepodařilo (plné úložiště?) – zkuste menší logo');
     A.toast('Profil uložen'); A.go('/history');
   });
+
+  /* ---------- vlastní rozbalovací seznam (vylepšení nativního <select>, ten zůstává skrytý jako zdroj hodnoty) ---------- */
+  var DD = null; // { sel, btn, list, active, typed, typedAt }
+  var ddUid = 0;
+  function ddLabel(sel) {
+    var l = sel.labels && sel.labels[0] || (sel.closest('.field') || document).querySelector('label');
+    if (l && !l.id) l.id = 'ddl' + (++ddUid);
+    return l;
+  }
+  function ddText(sel) { var o = sel.options[sel.selectedIndex]; return o ? o.textContent : ''; }
+  function ddSync(sel) {
+    var b = sel.nextElementSibling;
+    if (b && b.classList.contains('dd-btn')) { b.firstChild.textContent = ddText(sel); b.disabled = sel.disabled; }
+  }
+  A.enhanceSelects = function (root) {
+    (root || document).querySelectorAll('select:not([data-enh])').forEach(function (sel) {
+      var b = document.createElement('button'), l = ddLabel(sel);
+      b.type = 'button'; b.className = 'dd-btn' + (sel.classList.contains('invalid') ? ' invalid' : '');
+      b.setAttribute('aria-haspopup', 'listbox'); b.setAttribute('aria-expanded', 'false');
+      if (l) b.setAttribute('aria-labelledby', l.id); else if (sel.getAttribute('aria-label')) b.setAttribute('aria-label', sel.getAttribute('aria-label'));
+      b.innerHTML = '<span></span>';
+      sel.setAttribute('data-enh', ''); sel.classList.add('dd-native'); sel.tabIndex = -1; sel.setAttribute('aria-hidden', 'true');
+      sel.parentNode.insertBefore(b, sel.nextSibling);
+      ddSync(sel);
+    });
+  };
+  function ddEnabled(o) { return !o.disabled; }
+  function ddOpen(btn) {
+    var sel = btn.previousElementSibling;
+    if (DD) ddClose();
+    if (btn.disabled || !sel) return;
+    var list = document.createElement('ul'), host = btn.closest('dialog') || document.body;
+    list.className = 'dd-list'; list.setAttribute('role', 'listbox'); list.id = 'ddlist';
+    var lid = btn.getAttribute('aria-labelledby'); if (lid) list.setAttribute('aria-labelledby', lid);
+    Array.prototype.forEach.call(sel.options, function (o, i) {
+      var li = document.createElement('li');
+      li.className = 'dd-opt'; li.id = 'ddo' + i; li.setAttribute('role', 'option'); li.dataset.i = i;
+      li.setAttribute('aria-selected', i === sel.selectedIndex ? 'true' : 'false');
+      if (o.disabled) li.setAttribute('aria-disabled', 'true');
+      li.innerHTML = '<span>' + esc(o.textContent) + '</span>' + (i === sel.selectedIndex ? A.icon('check') : '');
+      list.appendChild(li);
+    });
+    host.appendChild(list);
+    DD = { sel: sel, btn: btn, list: list, active: sel.selectedIndex, typed: '', typedAt: 0 };
+    btn.setAttribute('aria-expanded', 'true'); btn.setAttribute('aria-controls', 'ddlist');
+    ddPlace(); ddActive(DD.active);
+  }
+  function ddPlace() {
+    if (!DD) return;
+    var r = DD.btn.getBoundingClientRect(), l = DD.list, vh = window.innerHeight, gap = 4;
+    var below = vh - r.bottom - gap - 8, above = r.top - gap - 8, h = Math.min(l.scrollHeight, vh * 0.5);
+    var up = below < h && above > below;
+    l.style.maxHeight = Math.max(120, Math.min(vh * 0.5, up ? above : below)) + 'px';
+    l.style.width = r.width + 'px';
+    l.style.left = Math.max(8, Math.min(r.left, window.innerWidth - r.width - 8)) + 'px';
+    if (up) { l.style.top = 'auto'; l.style.bottom = (vh - r.top + gap) + 'px'; l.classList.add('up'); }
+    else { l.style.bottom = 'auto'; l.style.top = (r.bottom + gap) + 'px'; l.classList.remove('up'); }
+  }
+  function ddClose(focus) {
+    if (!DD) return;
+    var d = DD; DD = null;
+    d.list.remove(); d.btn.setAttribute('aria-expanded', 'false'); d.btn.removeAttribute('aria-activedescendant'); d.btn.removeAttribute('aria-controls');
+    if (focus && d.btn.isConnected) d.btn.focus();
+  }
+  function ddActive(i) {
+    if (!DD) return;
+    var items = DD.list.children, old = DD.list.querySelector('.act');
+    if (old) old.classList.remove('act');
+    if (i < 0 || !items[i]) return;
+    DD.active = i; items[i].classList.add('act'); DD.btn.setAttribute('aria-activedescendant', items[i].id);
+    items[i].scrollIntoView({ block: 'nearest' });
+  }
+  function ddMove(from, step) {
+    var o = DD.sel.options, i = from + step;
+    while (i >= 0 && i < o.length) { if (ddEnabled(o[i])) return i; i += step; }
+    return from;
+  }
+  function ddPick(i) {
+    var d = DD, o = d.sel.options[i];
+    if (!o || o.disabled) return;
+    var changed = d.sel.selectedIndex !== i;
+    d.sel.selectedIndex = i; ddSync(d.sel); ddClose(true);
+    if (changed) d.sel.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('.dd-btn');
+    if (b) { if (DD && DD.btn === b) ddClose(true); else ddOpen(b); return; }
+    var li = e.target.closest && e.target.closest('.dd-opt');
+    if (li && DD) { ddPick(+li.dataset.i); return; }
+    if (DD) ddClose();
+  });
+  document.addEventListener('keydown', function (e) {
+    var b = e.target.closest && e.target.closest('.dd-btn');
+    if (!DD) {
+      if (b && (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); ddOpen(b); }
+      return;
+    }
+    var n = DD.sel.options.length;
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); ddClose(true); }
+    else if (e.key === 'Tab') ddClose();
+    else if (e.key === 'ArrowDown') { e.preventDefault(); ddActive(ddMove(DD.active, 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); ddActive(ddMove(DD.active, -1)); }
+    else if (e.key === 'Home') { e.preventDefault(); ddActive(ddMove(-1, 1)); }
+    else if (e.key === 'End') { e.preventDefault(); ddActive(ddMove(n, -1)); }
+    else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); ddPick(DD.active); }
+    else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      var now = Date.now(); DD.typed = (now - DD.typedAt > 700 ? '' : DD.typed) + e.key.toLowerCase(); DD.typedAt = now;
+      var o = DD.sel.options, k, hit = -1;
+      for (k = 0; k < n; k++) { var j = (DD.active + (DD.typed.length > 1 ? 0 : 1) + k) % n; if (ddEnabled(o[j]) && o[j].textContent.toLowerCase().indexOf(DD.typed) === 0) { hit = j; break; } }
+      if (hit >= 0) ddActive(hit);
+    }
+  }, true);
+  document.addEventListener('mouseover', function (e) {
+    var li = DD && e.target.closest && e.target.closest('.dd-opt');
+    if (li && !li.getAttribute('aria-disabled')) ddActive(+li.dataset.i);
+  });
+  document.addEventListener('focusin', function (e) { // klik na <label> zaměří skrytý select → přesměrovat na tlačítko
+    var t = e.target;
+    if (t.classList && t.classList.contains('dd-native') && t.nextElementSibling) t.nextElementSibling.focus();
+  });
+  window.addEventListener('scroll', function (e) { if (DD && !DD.list.contains(e.target)) ddClose(); }, true);
+  window.addEventListener('resize', function () { ddClose(); });
+  window.addEventListener('hashchange', function () { ddClose(); });
+  new MutationObserver(function () {
+    A.enhanceSelects(document.body);
+    if (DD && !DD.btn.isConnected) ddClose();
+  }).observe(document.body, { childList: true, subtree: true });
+  document.addEventListener('DOMContentLoaded', function () { A.enhanceSelects(document.body); });
 
   /* ---------- start ---------- */
   A.start = function () {

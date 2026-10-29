@@ -4,7 +4,7 @@ var Viz = (function () {
   'use strict';
   var A = App, LIMIT = 2, MAX_SIDE = 1600, NOTE = 'Orientační vizualizace – skutečný vzhled se může lišit.';
   var S = { server: null, used: {}, busy: null, error: null, mode: {}, cut: {} };
-  var MODES = [['po', 'Vizualizace'], ['pred', 'Původní fotka'], ['cmp', 'Porovnat']];
+  var MODES = [['po', 'Vizualizace'], ['pred', 'Původní'], ['cmp', 'Porovnat']];
 
   function esc(s) { return A.esc(s); }
   function used(c) { return Math.max(c.visualsUsed || 0, S.used[c.id] || 0); }
