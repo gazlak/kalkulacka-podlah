@@ -194,7 +194,7 @@ var App = (function () {
   A.render = function (html, opts) {
     opts = opts || {};
     var main = document.getElementById('app'), user = Store.currentUser();
-    main.className = opts.wide ? 'wide' : '';
+    main.className = opts.split ? 'split' : opts.wide ? 'wide' : '';
     main.innerHTML = html;
     renderChrome(user, opts);
     window.scrollTo(0, 0);
@@ -301,7 +301,8 @@ var App = (function () {
     var demo = Store.db.users.map(function (u) {
       return '<button type="button" class="chip" data-click="fillLogin" data-email="' + esc(u.email) + '" data-pw="' + esc(u.password) + '">' + esc(u.email) + ' <span class="muted">· ' + (u.role === 'admin' ? 'správce' : 'podlahář') + '</span></button>';
     }).join('');
-    A.render('<div class="auth">' + authBrand('Kalkulačka schodů', 'Kalkulace obkladu schodů pro podlahářské firmy') +
+    A.render('<div class="split-wrap"><div class="split-form"><img class="brand-logo split-logo" src="img/kprodukt-logo.png" alt="K-Produkt"><div class="auth">' +
+      '<div class="auth-head"><h1>Přihlaste se</h1><p>Kalkulace obkladu schodů pro podlahářské firmy</p></div>' +
       '<div class="card"><div id="loginErr"></div>' +
       '<form data-submit="login" novalidate>' +
       '<div class="field"><label for="email">E-mail</label><input type="email" id="email" name="email" autocomplete="username" inputmode="email" autocapitalize="none"></div>' +
@@ -311,7 +312,8 @@ var App = (function () {
       '<a class="btn ghost block mt-2" href="#/forgot">Zapomenuté heslo</a></div>' +
       '<p class="auth-alt">Nemáte účet? <a href="#/register">Zaregistrovat se</a></p>' +
       '<details class="card demo-accounts"><summary>Demo účty (ukázková data)' + A.icon('chev-d') + '</summary><p class="small muted mt-2">Klepnutím vyplníte přihlašovací údaje.</p><div class="demo-chips">' + demo + '</div></details>' +
-      A.question('firms') + '</div>', { bare: true });
+      A.question('firms') + '</div></div>' +
+      '<aside class="split-glow" aria-hidden="true"><i></i><i></i><i></i><i></i><div class="glow-mark"><img src="img/kprodukt-logo-dark.png" alt=""><p>Kalkulačka schodů</p></div></aside></div>', { bare: true, split: true });
   });
   A.on('click', 'fillLogin', function (el) {
     var f = document.querySelector('form[data-submit=login]');
