@@ -313,7 +313,7 @@ var App = (function () {
       '<p class="auth-alt">Nemáte účet? <a href="#/register">Zaregistrovat se</a></p>' +
       '<details class="card demo-accounts"><summary>Demo účty (ukázková data)' + A.icon('chev-d') + '</summary><p class="small muted mt-2">Klepnutím vyplníte přihlašovací údaje.</p><div class="demo-chips">' + demo + '</div></details>' +
       A.question('firms') + '</div></div>' +
-      '<aside class="split-glow" aria-hidden="true"><i></i><i></i><i></i><i></i><div class="glow-mark"><img src="img/kprodukt-logo-dark.png" alt=""><p>Kalkulačka schodů</p></div></aside></div>', { bare: true, split: true });
+      '<aside class="split-glow has-photo" aria-hidden="true"><img class="glow-photo" src="img/login-schody.jpg" alt=""><i></i><i></i><i></i><i></i><div class="glow-mark"><img src="img/kprodukt-logo-dark.png" alt=""><p>Kalkulačka schodů</p></div></aside></div>', { bare: true, split: true });
   });
   A.on('click', 'fillLogin', function (el) {
     var f = document.querySelector('form[data-submit=login]');

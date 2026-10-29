@@ -545,6 +545,13 @@ main.split { max-width: none; padding: 0; margin: 0; }
   .glow-mark img { width: min(56%, 300px); height: auto; }
   .glow-mark p { margin: 0; font-family: var(--font-tab); color: rgb(255 255 255 / .72); font-size: var(--fs-lg); letter-spacing: .01em; }
 }
+@media (min-width: 860px) {
+  .split-glow.has-photo .glow-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: -3; filter: grayscale(1) contrast(1.05) brightness(.95); }
+  .split-glow.has-photo::before { content: ""; position: absolute; inset: 0; z-index: -2; background: #1f4790; mix-blend-mode: multiply; }
+  .split-glow.has-photo::after { content: ""; position: absolute; inset: 0; z-index: -1; background: radial-gradient(ellipse 55% 30% at 50% 50%, rgb(7 18 41 / .55), transparent 70%), linear-gradient(180deg, rgb(7 18 41 / .15) 0%, rgb(7 18 41 / .55) 100%); }
+  .split-glow.has-photo i { z-index: 0; mix-blend-mode: screen; opacity: .35; }
+  .split-glow.has-photo .glow-mark { z-index: 1; }
+}
 @keyframes kp-drift-1 { to { transform: translate(14%, 10%) scale(1.08); } }
 @keyframes kp-drift-2 { to { transform: translate(-18%, 12%) scale(.92); } }
 @keyframes kp-drift-3 { to { transform: translate(10%, -14%) scale(1.1); } }
