@@ -453,8 +453,7 @@ main.split { max-width: none; padding: 0; margin: 0; }
   .split-glow i:nth-child(4) { width: 52%; aspect-ratio: 1; left: 18%; bottom: -24%; background: #0e2a5c; animation: kp-drift-3 11s ease-in-out infinite alternate; }
   .split-glow i:nth-child(5) { width: 22%; aspect-ratio: 1; right: 22%; bottom: 14%; background: #c98a2b; animation: kp-drift-4 15s ease-in-out infinite alternate; }
   .glow-mark { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s-4); }
-  .glow-mark img { width: min(56%, 300px); height: auto; }
-  .glow-mark p { margin: 0; font-family: var(--font-tab); color: rgb(255 255 255 / .72); font-size: var(--fs-lg); }
+  .glow-mark p { margin: 0; font-family: var(--font-tab); color: rgb(255 255 255 / .8); font-size: var(--fs-xl); font-weight: 500; letter-spacing: -.01em; }
 }
 @keyframes kp-drift-1 { to { transform: translate(14%, 10%) scale(1.08); } }
 @keyframes kp-drift-2 { to { transform: translate(-18%, 12%) scale(.92); } }

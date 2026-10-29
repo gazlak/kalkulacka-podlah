@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-/** Auth obrazovky bez lišt, napůl: formulář vlevo, od 860 px vpravo panel s fotkou schodů a logem. */
+/** Auth obrazovky bez lišt, napůl: formulář vlevo (s logem), od 860 px vpravo panel s fotkou schodů. */
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
     <main id="app" className="split">
@@ -15,8 +15,6 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
           <img className="glow-photo" src="/img/login-schody.jpg" alt="" />
           <i /><i /><i /><i />
           <div className="glow-mark">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/img/kprodukt-logo-dark.png" alt="" />
             <p>Kalkulačka schodů</p>
           </div>
         </aside>
