@@ -67,7 +67,9 @@ function Wizard({ id, step }: { id: string; step: string }) {
     ? `${c.number ? "Změny uloženy" : "Koncept uložen"} ${fmtTime(c.updatedAt)}`
     : "Zatím neuloženo";
 
-  function next() {
+  // každý krok je samostatná route a nový krok načítá kalkulaci ze serveru,
+  // proto se před navigací musí dokončit rozdělaná uložení
+  async function next() {
     const bad = stepErrors(c!, s);
     if (Object.keys(bad).length) {
       requestShowErrors();
@@ -75,9 +77,13 @@ function Wizard({ id, step }: { id: string; step: string }) {
       return;
     }
     clearShowErrors();
+    await draft.flush();
     router.push(`/wizard/${id}/${s + 1}`);
   }
-  const back = () => router.push(s === 1 ? "/history" : `/wizard/${id}/${s - 1}`);
+  const back = async () => {
+    await draft.flush();
+    router.push(s === 1 ? "/history" : `/wizard/${id}/${s - 1}`);
+  };
 
   return (
     <>
