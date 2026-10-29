@@ -30,6 +30,32 @@ export function inviteMail(to: string, link: string): MailMessage {
   };
 }
 
+export function verifyMail(to: string, link: string): MailMessage {
+  return {
+    to,
+    subject: "Ověření e-mailu – Kalkulačka schodů",
+    text: `Dobrý den,\n\nděkujeme za registraci. Účet aktivujete otevřením odkazu (platí 24 hodin):\n${link}\n\nPokud jste se neregistrovali, tento e-mail ignorujte.`,
+    html: layout(
+      `<p>Dobrý den,</p><p>děkujeme za registraci. Účet aktivujete klepnutím na odkaz. <b>Odkaz platí 24 hodin.</b></p>` +
+        `<p><a href="${esc(link)}">Ověřit e-mail</a></p><p style="color:#6b665f">Pokud jste se neregistrovali, tento e-mail ignorujte.</p>`,
+    ),
+  };
+}
+
+/** Registrace na e-mail, který už účet má: neprozradíme to na obrazovce, majitel dostane upozornění. */
+export function accountExistsMail(to: string, loginLink: string, forgotLink: string): MailMessage {
+  return {
+    to,
+    subject: "Účet už existuje – Kalkulačka schodů",
+    text: `Dobrý den,\n\nněkdo se pokusil zaregistrovat s tímto e-mailem, ale účet už máte.\nPřihlášení: ${loginLink}\nZapomenuté heslo: ${forgotLink}\n\nPokud jste to nebyli vy, tento e-mail ignorujte.`,
+    html: layout(
+      `<p>Dobrý den,</p><p>někdo se pokusil zaregistrovat s tímto e-mailem, ale účet už máte.</p>` +
+        `<p><a href="${esc(loginLink)}">Přihlásit se</a> · <a href="${esc(forgotLink)}">Zapomenuté heslo</a></p>` +
+        `<p style="color:#6b665f">Pokud jste to nebyli vy, tento e-mail ignorujte.</p>`,
+    ),
+  };
+}
+
 /** Kalkulace zákazníkovi: text upravený podlahářem + PDF v příloze. */
 export function calcMail(to: string, subject: string, body: string, pdf: Buffer, filename: string): MailMessage {
   const paragraphs = body.split(/\n{2,}/).map((p) => `<p>${esc(p).replace(/\n/g, "<br>")}</p>`).join("");

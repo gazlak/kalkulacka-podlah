@@ -14,8 +14,14 @@ jobs:
         ports: ["5432:5432"]
         options: >-
           --health-cmd "pg_isready -U kalkulacka" --health-interval 5s --health-retries 20
+      mailpit:
+        image: axllent/mailpit
+        ports: ["1025:1025", "8025:8025"]
     env:
       DATABASE_URL: postgres://kalkulacka:kalkulacka@localhost:5432/kalkulacka
+      SMTP_HOST: localhost
+      SMTP_PORT: "1025"
+      MAILPIT_URL: http://localhost:8025
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

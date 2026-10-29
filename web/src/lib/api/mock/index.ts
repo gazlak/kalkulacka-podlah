@@ -16,7 +16,7 @@ interface StoredUser extends User {
   failedAttempts: number;
 }
 interface Token {
-  type: "reset" | "invite";
+  type: "reset" | "invite" | "verify";
   userId: string;
   expires: number;
 }
@@ -146,6 +146,11 @@ function inviteMail(u: StoredUser): MailPreview {
   return { to: u.email, subject: "Pozvánka do Kalkulačky schodů", link: `/invite/${tok}`, kind: "invite", expiresInfo: "Odkaz platí 7 dní." };
 }
 
+function verifyPreview(u: StoredUser): MailPreview {
+  const tok = makeToken("verify", u.id, DAY);
+  return { to: u.email, subject: "Ověření e-mailu – Kalkulačka schodů", link: `/verify/${tok}`, kind: "verify", expiresInfo: "Odkaz platí 24 hodin." };
+}
+
 export const mockApi: Api = {
   auth: {
     async me() {
@@ -173,6 +178,7 @@ export const mockApi: Api = {
         save();
         return { ok: false, error: `Nesprávný e-mail nebo heslo. Zbývá pokusů: ${MAX_ATTEMPTS - u.failedAttempts}.` };
       }
+      if (u.status === "neověřen") return { ok: false, error: "unverified" };
       u.failedAttempts = 0;
       u.lockedUntil = null;
       save();
@@ -218,6 +224,39 @@ export const mockApi: Api = {
       if (name.trim()) u.profile.name = name.trim();
       delete load().tokens[token];
       commit();
+    },
+    async register(input) {
+      await wait();
+      const e = input.email.trim().toLowerCase();
+      let u = load().users.find((x) => x.email.toLowerCase() === e);
+      if (u && u.status !== "neověřen") return null;
+      if (!u) {
+        u = {
+          id: uid("u"), email: e, password: input.password, role: "user", status: "neověřen", failedAttempts: 0, lockedUntil: null,
+          profile: { name: input.name.trim(), company: input.company.trim(), ico: input.ico.replace(/\s/g, ""), phone: "", logo: null },
+        };
+        load().users.push(u);
+        commit();
+      }
+      return verifyPreview(u);
+    },
+    async verifyEmail(token) {
+      await wait();
+      const k = load().tokens[token];
+      const u = k && load().users.find((x) => x.id === k.userId);
+      if (!k || k.type !== "verify" || k.expires < Date.now() || !u) return { ok: false, error: "Odkaz je neplatný, použitý nebo vypršel." };
+      delete load().tokens[token];
+      if (u.status !== "neověřen") { commit(); return { ok: false, error: "Účet už je ověřený, přihlaste se." }; }
+      u.status = "aktivní";
+      commit();
+      setSession(u.id, false);
+      return { ok: true, user: pub(u) };
+    },
+    async resendVerify(email) {
+      await wait();
+      const e = email.trim().toLowerCase();
+      const u = load().users.find((x) => x.email.toLowerCase() === e);
+      return u && u.status === "neověřen" ? verifyPreview(u) : null;
     },
   },
 

@@ -12,7 +12,7 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash"),
   role: text("role", { enum: ["user", "admin"] }).notNull().default("user"),
-  status: text("status", { enum: ["aktivní", "pozván", "blokován"] }).notNull().default("pozván"),
+  status: text("status", { enum: ["aktivní", "neověřen", "pozván", "blokován"] }).notNull().default("pozván"),
   failedAttempts: integer("failed_attempts").notNull().default(0),
   lockedUntil: ts("locked_until"),
   name: text("name").notNull().default(""),
@@ -77,10 +77,10 @@ export const counters = pgTable("counters", {
   last: integer("last").notNull().default(0),
 });
 
-/** Jednorázové tokeny (reset hesla, pozvánka); ukládá se jen hash. */
+/** Jednorázové tokeny (reset hesla, pozvánka, ověření e-mailu po registraci); ukládá se jen hash. */
 export const tokens = pgTable("tokens", {
   hash: text("hash").primaryKey(),
-  type: text("type", { enum: ["reset", "invite"] }).notNull(),
+  type: text("type", { enum: ["reset", "invite", "verify"] }).notNull(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   expiresAt: ts("expires_at").notNull(),
   usedAt: ts("used_at"),

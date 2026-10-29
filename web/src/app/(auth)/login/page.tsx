@@ -5,9 +5,11 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { AuthBrand } from "@/components/auth/AuthBrand";
+import { MailPreviewCard } from "@/components/auth/MailPreviewCard";
 import { Alert } from "@/components/ui/misc";
 import { Field, Input } from "@/components/ui/Field";
 import { api } from "@/lib/api";
+import type { MailPreview } from "@/lib/api/client";
 import { keys, useGuestGuard } from "@/lib/hooks";
 
 function lockText(until: number, now: number) {
@@ -26,6 +28,8 @@ export default function LoginPage() {
   const [lockedUntil, setLockedUntil] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [busy, setBusy] = useState(false);
+  const [unverified, setUnverified] = useState<string | null>(null);
+  const [resent, setResent] = useState<{ mail: MailPreview | null } | null>(null);
 
   useEffect(() => {
     if (!lockedUntil) return;
@@ -43,6 +47,14 @@ export default function LoginPage() {
       router.replace("/history");
       return;
     }
+    setUnverified(null);
+    setResent(null);
+    if (r.error === "unverified") {
+      setLockedUntil(null);
+      setError("");
+      setUnverified(email.trim());
+      return;
+    }
     if (r.lockedUntil) {
       setNow(Date.now());
       setLockedUntil(r.lockedUntil);
@@ -58,7 +70,7 @@ export default function LoginPage() {
 
   return (
     <div className="auth">
-      <AuthBrand title="Kalkulačka schodů" sub="Kalkulace obkladu schodů pro podlahářské firmy" />
+      <AuthBrand title="Přihlaste se" sub="Kalkulace obkladu schodů pro podlahářské firmy" />
       <div className="card">
         <div id="loginErr">
           {lockedUntil !== null && (
@@ -67,6 +79,16 @@ export default function LoginPage() {
             </Alert>
           )}
           {error && <Alert kind="err">{error}</Alert>}
+          {unverified && (
+            <Alert kind="warn">
+              E-mail ještě není ověřený. Klepněte na odkaz, který jsme poslali na {unverified}.
+              <button type="button" className="btn sm block mt-2"
+                onClick={async () => setResent({ mail: await api.auth.resendVerify(unverified) })}>
+                Poslat ověřovací e-mail znovu
+              </button>
+            </Alert>
+          )}
+          {resent && (resent.mail ? <MailPreviewCard mail={resent.mail} /> : <Alert kind="ok">Nový ověřovací odkaz je na cestě.</Alert>)}
         </div>
         <form onSubmit={submit} noValidate>
           <Field label="E-mail" htmlFor="email">
@@ -85,6 +107,7 @@ export default function LoginPage() {
         </form>
         <Link className="btn ghost block mt-2" href="/forgot">Zapomenuté heslo</Link>
       </div>
+      <p className="auth-alt">Nemáte účet? <Link href="/register">Zaregistrovat se</Link></p>
     </div>
   );
 }

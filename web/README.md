@@ -19,6 +19,10 @@ npm run db:reset                                  # migrace + demo data (účty 
 npm run dev                                       # NEXT_PUBLIC_API=http z .env.local
 ```
 
+Obsazené porty: `DB_PORT=5446 SMTP_DEV_PORT=1027 MAILPIT_PORT=8027 docker compose -f ../docker-compose.yml up -d` (a stejné porty
+v `.env.local`), e2e na jiném portu `E2E_PORT=…`, s backendem `MAILPIT_URL=http://localhost:8027` (test registrace čte odkaz z Mailpitu).
+Pozor: `db:*` skripty `.env.local` nenačítají – bez `DATABASE_URL` v prostředí jdou na `localhost:5432`.
+
 Skripty: `db:generate` (nová migrace ze `schema.ts`), `db:migrate`, `db:seed`, `db:reset` (smaže vše!),
 `test` (Vitest, služby nad PGlite – Docker nepotřeba), `e2e` (`E2E_API=mock|http npx playwright test`).
 
@@ -38,6 +42,10 @@ src/lib/api/http/     HTTP klient implementující `Api`
 - **Autorizace:** vlastník zapisuje, admin cizí kalkulace jen čte (403), podlahář cizí nevidí (404). Správa/ceník jen admin.
 - **Číslování:** `RRRR-NNNN` z tabulky `counters` (jedna společná řada), přidělí se v transakci při prvním uložení kalkulace; zároveň se uloží snapshot ceníku (JSONB).
 - **Přihlášení:** vlastní serverové relace – náhodný token v `HttpOnly; SameSite=Lax` cookie, v DB jen jeho SHA‑256; „zapamatovat“ = 30 dní, jinak session cookie / 12 h. Hesla argon2id. Po 5 chybách zámek na 15 min (atomicky v SQL). Reset hesla (1 h) a pozvánka (7 dní): jednorázové tokeny, v DB jen hash. „Zapomenuté heslo“ odpovídá stejně pro neexistující účet. Rate limit login/forgot v paměti procesu.
+- **Registrace:** veřejná `/register` (firma, IČO, jméno, e-mail, heslo, souhlas). Účet vznikne jako `neověřen`, aktivuje ho
+  jednorázový odkaz `/verify/<token>` z e-mailu (24 h), který rovnou přihlásí. Odpověď je stejná pro nový i existující
+  e-mail; existující účet dostane jen upozornění, neověřenému se pošle nový odkaz (heslo se nepřepíše). Přihlášení
+  neověřeného účtu se správným heslem vrátí `unverified` a nabídne nové poslání odkazu. Rate limit register/resend.
 - **Obrázky:** logo a fotky vzorů se nahrávají jako data URL (PNG/JPEG/WebP ≤ 2 MB, kontrola magic bytes; SVG se nepřijímá), ukládají se do tabulky `files` pod SHA‑256 a API vrací URL `/api/files/<hash>` (neměnné → snapshot ceníku na ně smí odkazovat).
 - **PDF:** `GET /api/calculations/:id/pdf` – Chromium (Playwright) vytiskne interní stránku `/print/:id`, kterou renderuje tatáž komponenta `PdfSheet` jako náhled v aplikaci. Přístup na ni má jen krátkodobý podepsaný klíč. E-mail zákazníkovi nese stejné PDF v příloze; odeslání se loguje (`mail_log`).
 - **GDPR:** `DELETE /api/users/:id` (admin) smaže účet včetně kalkulací, relací a tokenů; hesla ani tokeny se neloguje.

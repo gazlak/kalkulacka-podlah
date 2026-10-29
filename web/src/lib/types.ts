@@ -1,5 +1,5 @@
 export type Role = "user" | "admin";
-export type UserStatus = "aktivní" | "pozván" | "blokován";
+export type UserStatus = "aktivní" | "neověřen" | "pozván" | "blokován";
 export type CalcStatus = "koncept" | "odesláno" | "přijato" | "zamítnuto";
 
 export interface Profile {

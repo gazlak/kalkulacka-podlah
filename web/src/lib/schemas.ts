@@ -15,6 +15,18 @@ export const setPasswordSchema = z
   .object({ pw: passwordSchema, pw2: z.string() })
   .refine((v) => v.pw === v.pw2, { path: ["pw2"], message: "Hesla se neshodují" });
 
+export const registerSchema = z
+  .object({
+    company: z.string().trim().min(1, "Vyplňte název firmy").max(200),
+    ico: z.string().trim().refine((v) => v === "" || /^\d{8}$/.test(v), "IČO má 8 číslic"),
+    name: z.string().trim().min(1, "Vyplňte jméno").max(200),
+    email: emailSchema.pipe(z.string().max(200)),
+    pw: passwordSchema.pipe(z.string().max(200)),
+    pw2: z.string(),
+    terms: z.literal(true, { error: "Bez souhlasu účet nevytvoříme" }),
+  })
+  .refine((v) => v.pw === v.pw2, { path: ["pw2"], message: "Hesla se neshodují" });
+
 export const profileSchema = z.object({
   name: z.string().trim(),
   company: z.string().trim(),

@@ -1,4 +1,5 @@
 # Vývoj: Postgres + Mailpit (zachytává odeslané e-maily na http://localhost:8025).
+# Obsazené porty jde přesměrovat: DB_PORT, SMTP_DEV_PORT, MAILPIT_PORT (pak upravit i web/.env.local).
 services:
   db:
     image: postgres:16
@@ -6,7 +7,7 @@ services:
       POSTGRES_USER: kalkulacka
       POSTGRES_PASSWORD: kalkulacka
       POSTGRES_DB: kalkulacka
-    ports: ["5432:5432"]
+    ports: ["${DB_PORT:-5432}:5432"]
     volumes: [dbdata:/var/lib/postgresql/data]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U kalkulacka"]
@@ -14,6 +15,6 @@ services:
       retries: 20
   mailpit:
     image: axllent/mailpit
-    ports: ["1025:1025", "8025:8025"]
+    ports: ["${SMTP_DEV_PORT:-1025}:1025", "${MAILPIT_PORT:-8025}:8025"]
 volumes:
   dbdata:

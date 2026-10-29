@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { users } from "../db/schema";
-import { acceptInvite, checkToken, login, requestReset, resetPassword, userBySession } from "./auth";
+import { acceptInvite, checkToken, login, register, requestReset, resendVerify, resetPassword, userBySession, verifyEmail } from "./auth";
 import { draftCalc, duplicateCalc, finalizeCalc, getCalc, listCalcs, recalcCalc, saveCalc, sendCalc, setCalcStatus } from "./calculations";
 import { storeDataUrl } from "./files";
 import { currentPricing, updateRates } from "./pricing";
@@ -145,6 +145,65 @@ describe("reset hesla a pozvánky", () => {
     expect(r.result).toMatchObject({ ok: true, user: { profile: { name: "Nový Člověk" } } });
     await deleteUser(t.db, admin, user.id);
     expect(await lookupUser(t.db, admin, user.id)).toBeNull();
+  });
+});
+
+describe("registrace a ověření e-mailu", () => {
+  const verifyLink = (body: string) => /\/verify\/([\w-]+)/.exec(body)![1];
+  const tick = () => new Promise((r) => setTimeout(r, 50));
+  const input = { company: "Podlahy Kříž", ico: "12345678", name: "Jan Kříž", email: "Jan@Kriz.cz", password: "tajneHeslo1" };
+
+  it("nový účet čeká na ověření; přihlášení se správným heslem vrátí unverified, se špatným běžnou chybu", async () => {
+    await register(t, input);
+    await tick();
+    const mail = t.mailer.sent.at(-1)!;
+    expect(mail.to).toBe("jan@kriz.cz");
+    expect(mail.subject).toContain("Ověření");
+    expect((await login(t.db, { email: "jan@kriz.cz", password: "tajneHeslo1", remember: false })).result).toEqual({ ok: false, error: "unverified" });
+    const bad = (await login(t.db, { email: "jan@kriz.cz", password: "spatne", remember: false })).result;
+    expect(bad).toMatchObject({ ok: false });
+    expect((bad as { error: string }).error).toContain("Nesprávný e-mail nebo heslo");
+  });
+
+  it("odkaz účet aktivuje, přihlásí a je jednorázový; profil nese firmu", async () => {
+    await resendVerify(t, "jan@kriz.cz");
+    await tick();
+    const token = verifyLink(t.mailer.sent.at(-1)!.text);
+    const r = await verifyEmail(t.db, token);
+    expect(r.result).toMatchObject({ ok: true, user: { status: "aktivní", role: "user", profile: { company: "Podlahy Kříž", ico: "12345678" } } });
+    expect(await userBySession(t.db, r.session!.token)).not.toBeNull();
+    expect((await verifyEmail(t.db, token)).result.ok).toBe(false);
+    expect((await login(t.db, { email: "jan@kriz.cz", password: "tajneHeslo1", remember: false })).result.ok).toBe(true);
+  });
+
+  it("registrace na existující účet nemění heslo ani stav, majitel dostane upozornění", async () => {
+    await register(t, { ...input, password: "jineHeslo99" });
+    await tick();
+    expect(t.mailer.sent.at(-1)!.subject).toContain("Účet už existuje");
+    expect((await login(t.db, { email: "jan@kriz.cz", password: "jineHeslo99", remember: false })).result.ok).toBe(false);
+    expect((await login(t.db, { email: "jan@kriz.cz", password: "tajneHeslo1", remember: false })).result.ok).toBe(true);
+  });
+
+  it("opakovaná registrace neověřeného e-mailu nepřepíše heslo; starý odkaz přestane platit", async () => {
+    await register(t, { ...input, email: "druhy@kriz.cz" });
+    await tick();
+    const first = verifyLink(t.mailer.sent.at(-1)!.text);
+    await register(t, { ...input, email: "druhy@kriz.cz", password: "utocnik123" });
+    await tick();
+    const second = verifyLink(t.mailer.sent.at(-1)!.text);
+    expect((await verifyEmail(t.db, first)).result.ok).toBe(false);
+    expect((await verifyEmail(t.db, second)).result.ok).toBe(true);
+    expect((await login(t.db, { email: "druhy@kriz.cz", password: "utocnik123", remember: false })).result.ok).toBe(false);
+    expect((await login(t.db, { email: "druhy@kriz.cz", password: "tajneHeslo1", remember: false })).result.ok).toBe(true);
+  });
+
+  it("krátké heslo odmítne; neověřený účet nemá relaci ani přes resend cizího e-mailu", async () => {
+    await expect(register(t, { ...input, email: "kratke@kriz.cz", password: "abc" })).rejects.toMatchObject({ status: 400 });
+    const before = t.mailer.sent.length;
+    await resendVerify(t, "nikdo@nikde.cz");
+    await resendVerify(t, "novak@demo.cz");
+    await tick();
+    expect(t.mailer.sent.length).toBe(before);
   });
 });
 

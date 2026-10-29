@@ -33,6 +33,9 @@ export const httpApi: Api = {
     checkToken: (token, type) => post<TokenCheck>("/api/auth/token", { token, type }),
     resetPassword: async (token, password) => { await post("/api/auth/reset", { token, password }); },
     acceptInvite: async (token, password, name) => { await post("/api/auth/invite", { token, password, name }); },
+    register: async (input) => { await post("/api/auth/register", input); return null; },
+    verifyEmail: (token) => post<LoginResult>("/api/auth/verify", { token }),
+    resendVerify: async (email) => { await post("/api/auth/resend-verify", { email }); return null; },
   },
   calculations: {
     list: () => get<Calculation[]>("/api/calculations"),

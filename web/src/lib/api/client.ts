@@ -4,7 +4,18 @@ import type { Calculation, CalcStatus, Pattern, Pricing, Profile, Rates, Role, U
 
 export type LoginResult =
   | { ok: true; user: User }
+  /** error "locked" = zámek po chybných pokusech (lockedUntil), "unverified" = registrace čeká na ověření e-mailu. */
   | { ok: false; error: string; lockedUntil?: number };
+
+export type TokenType = "reset" | "invite" | "verify";
+
+export interface RegisterInput {
+  company: string;
+  ico: string;
+  name: string;
+  email: string;
+  password: string;
+}
 
 export type TokenCheck = { ok: true; email: string } | { ok: false; error: string };
 
@@ -13,7 +24,7 @@ export interface MailPreview {
   subject: string;
   /** Odkaz v aplikaci (jen v mocku se zobrazuje jako „otevřít odkaz (demo)“); u skutečného backendu prázdný – e-mail odešel. */
   link: string;
-  kind: "reset" | "invite";
+  kind: "reset" | "invite" | "verify";
   expiresInfo: string;
 }
 
@@ -38,9 +49,14 @@ export interface Api {
     login(input: { email: string; password: string; remember: boolean }): Promise<LoginResult>;
     logout(): Promise<void>;
     requestReset(email: string, simulateExpired: boolean): Promise<MailPreview | null>;
-    checkToken(token: string, type: "reset" | "invite"): Promise<TokenCheck>;
+    checkToken(token: string, type: TokenType): Promise<TokenCheck>;
     resetPassword(token: string, password: string): Promise<void>;
     acceptInvite(token: string, password: string, name: string): Promise<void>;
+    /** Veřejná registrace: účet čeká na ověření e-mailu. Odpověď neprozradí, zda e-mail už účet má (mock vrací náhled e-mailu). */
+    register(input: RegisterInput): Promise<MailPreview | null>;
+    /** Ověří e-mail odkazem z registrace, aktivuje účet a přihlásí. */
+    verifyEmail(token: string): Promise<LoginResult>;
+    resendVerify(email: string): Promise<MailPreview | null>;
   };
   calculations: {
     /** Jen kalkulace, které smí aktuální uživatel vidět (admin všechny). */

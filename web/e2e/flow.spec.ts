@@ -91,3 +91,54 @@ test("blokace po 5 chybných pokusech", async ({ page }) => {
   }
   await expect(page.getByText(/zablokované ještě/)).toBeVisible();
 });
+
+/** Ověřovací odkaz: v mocku z náhledu e-mailu na obrazovce, s backendem z Mailpitu (MAILPIT_URL). */
+async function verifyLink(page: Page, email: string): Promise<string> {
+  if (process.env.E2E_API !== "http") {
+    const href = await page.getByRole("link", { name: "Otevřít odkaz (demo)" }).getAttribute("href");
+    return href!;
+  }
+  const base = process.env.MAILPIT_URL ?? "http://localhost:8025";
+  for (let i = 0; i < 20; i++) {
+    const r = await fetch(`${base}/api/v1/search?query=${encodeURIComponent(`to:"${email}"`)}`);
+    const { messages } = (await r.json()) as { messages: { ID: string }[] };
+    if (messages?.length) {
+      const m = (await (await fetch(`${base}/api/v1/message/${messages[0].ID}`)).json()) as { Text: string };
+      return new URL(/https?:\/\/\S+\/verify\/[\w-]+/.exec(m.Text)![0]).pathname;
+    }
+    await page.waitForTimeout(250);
+  }
+  throw new Error(`Ověřovací e-mail pro ${email} nedorazil`);
+}
+
+test("registrace → bez ověření se nepřihlásí → odkaz z e-mailu přihlásí", async ({ page }) => {
+  const email = `novy${Date.now()}@firma.cz`;
+  await page.goto("/login");
+  await page.getByRole("link", { name: "Zaregistrovat se" }).click();
+  await expect(page).toHaveURL(/\/register/);
+
+  await page.getByRole("button", { name: "Vytvořit účet" }).click();
+  await expect(page.getByText("Vyplňte název firmy")).toBeVisible();
+  await expect(page.getByText("Bez souhlasu účet nevytvoříme")).toBeVisible();
+
+  await page.getByLabel("Firma").fill("Podlahy Test");
+  await page.getByLabel("Jméno a příjmení").fill("Petr Test");
+  await page.getByLabel("E-mail").fill(email);
+  await page.getByLabel("Heslo", { exact: true }).fill("testHeslo123");
+  await page.getByLabel("Heslo znovu").fill("testHeslo123");
+  await page.getByText("Souhlasím s obchodními podmínkami").click();
+  await page.getByRole("button", { name: "Vytvořit účet" }).click();
+  await expect(page.getByRole("heading", { name: "Zkontrolujte e-mail" })).toBeVisible();
+  const link = await verifyLink(page, email);
+
+  await page.goto("/login");
+  await page.getByLabel("E-mail").fill(email);
+  await page.getByLabel("Heslo").fill("testHeslo123");
+  await page.getByRole("button", { name: "Přihlásit se" }).click();
+  await expect(page.getByText("E-mail ještě není ověřený")).toBeVisible();
+
+  await page.goto(link);
+  await expect(page).toHaveURL(/\/history/);
+  await page.goto(link);
+  await expect(page.getByText("Odkaz je neplatný, použitý nebo vypršel.")).toBeVisible();
+});

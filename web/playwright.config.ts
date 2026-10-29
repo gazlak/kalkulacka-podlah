@@ -2,7 +2,7 @@ import { defineConfig } from "@playwright/test";
 
 /** E2E_API=http (výchozí pro backend) | mock. Server se spouští s odpovídajícím NEXT_PUBLIC_API. */
 const api = process.env.E2E_API ?? "mock";
-const port = api === "http" ? 3101 : 3100;
+const port = Number(process.env.E2E_PORT) || (api === "http" ? 3101 : 3100);
 
 export default defineConfig({
   testDir: "e2e",
