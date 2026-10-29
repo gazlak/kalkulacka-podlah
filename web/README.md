@@ -63,7 +63,15 @@ cd .. && cp web/.env.example .env   # doplnit DB_PASSWORD, APP_URL, SMTP_*, MAIL
 docker compose -f docker-compose.prod.yml --env-file .env up -d --build
 ```
 
-Migrace se aplikují při startu (`src/instrumentation.ts`). Demo data jen na zkoušku: `DATABASE_URL=… npm run db:seed`.
+Při startu (`src/instrumentation.ts`) se aplikují migrace a doplní výchozí ceník (vzory, sazby), pokud chybí.
+**Demo účty ani ukázkové kalkulace se v provozu nezakládají** a přihlášení žádné účty nenabízí.
+
+První admin: do `.env` dejte `ADMIN_EMAIL=…`. Dokud v DB žádný admin není, dostane při startu pozvánku a heslo si
+nastaví sám (7 dní, jednorázový odkaz). Když e-mail neodejde (SMTP ještě nejde), odkaz je v logu:
+`docker compose -f docker-compose.prod.yml logs app | grep "\[admin\]"`. Jakmile admin existuje, nic se už neposílá.
+Podlaháři se registrují sami na `/register`, případně je pozve admin ve Správě. Žádný dump DB není potřeba.
+
+Demo data jen na zkoušku (nikdy na ostré DB): `DATABASE_URL=… npm run db:seed`.
 Obraz stojí na `mcr.microsoft.com/playwright` (Chromium pro PDF); verze v `Dockerfile` musí odpovídat balíčku `playwright`.
 Za reverzní proxy (HTTPS) posílejte `X-Forwarded-For` (rate limit) a nastavte `APP_URL` na veřejnou adresu.
 

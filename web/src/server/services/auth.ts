@@ -228,4 +228,27 @@ export async function resendVerify(ctx: Ctx, email: string): Promise<null> {
   return null;
 }
 
+/* ---------- první admin ostré instance ---------- */
+
+/**
+ * Prázdná ostrá DB nemá žádný účet. Dokud v ní není admin, založí pozvaného admina s e-mailem z ADMIN_EMAIL
+ * a pošle mu pozvánku (heslo si nastaví sám, nikde se nepředává). Když e-mail neodejde (SMTP ještě není),
+ * vrátí odkaz, aby ho šlo předat ručně z logu. Vrací null, když admin už existuje.
+ */
+export async function bootstrapAdmin(ctx: Ctx, email: string): Promise<{ email: string; link: string | null } | null> {
+  const [admin] = await ctx.db.select({ id: users.id }).from(users).where(eq(users.role, "admin")).limit(1);
+  if (admin) return null;
+  const normalized = email.trim().toLowerCase();
+  const [u] = await ctx.db
+    .insert(users)
+    .values({ email: normalized, role: "admin", status: "pozván" })
+    .onConflictDoUpdate({ target: users.email, set: { role: "admin" } })
+    .returning();
+  if (u.status !== "pozván") return { email: normalized, link: null }; // existující aktivní účet jen povýšen
+  const token = await issueToken(ctx.db, "invite", u.id, config.inviteTtlMs);
+  const link = `${config.appUrl()}/invite/${token}`;
+  const sent = await sendSafely(ctx, inviteMail(u.email, link));
+  return { email: normalized, link: sent ? null : link };
+}
+
 export type { User };

@@ -12,6 +12,7 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       MAIL_FROM: ${MAIL_FROM}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
       INTERNAL_URL: http://127.0.0.1:3000
     depends_on:
       db: { condition: service_healthy }

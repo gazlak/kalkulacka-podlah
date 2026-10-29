@@ -4,16 +4,21 @@ import type { Db } from "./db";
 import { calculations, counters, patterns, rates, users } from "./db/schema";
 import { SEED_CALCS, SEED_PATTERNS, SEED_RATES, SEED_USERS } from "@/lib/api/mock/seed";
 
-/** Ukázková data jako v mocku (demo účty, ceník, 5 kalkulací). Idempotentní jen na prázdné DB. */
+/** Výchozí ceník (vzory + sazby); existující řádky nepřepíše. Patří i do ostré DB, bez něj nejde počítat. */
+export async function seedPricing(db: Db): Promise<void> {
+  await db.insert(patterns).values(
+    SEED_PATTERNS.map((p) => ({
+      id: p.id, name: p.name, texture: p.texture, tint: p.tint, materialPerM2: p.materialPerM2, wastePct: p.wastePct, laborPerTread: p.laborPerTread,
+    })),
+  ).onConflictDoNothing();
+  await db.insert(rates).values({ id: 1, ...SEED_RATES }).onConflictDoNothing();
+}
+
+/** Ukázková data jako v mocku (demo účty, ceník, 5 kalkulací). Idempotentní jen na prázdné DB. Jen pro vývoj a zkoušku. */
 export async function seed(db: Db, now = Date.now()): Promise<void> {
   await db.transaction(async (tx0) => {
     const tx = tx0 as unknown as Db;
-    await tx.insert(patterns).values(
-      SEED_PATTERNS.map((p) => ({
-        id: p.id, name: p.name, texture: p.texture, tint: p.tint, materialPerM2: p.materialPerM2, wastePct: p.wastePct, laborPerTread: p.laborPerTread,
-      })),
-    ).onConflictDoNothing();
-    await tx.insert(rates).values({ id: 1, ...SEED_RATES }).onConflictDoNothing();
+    await seedPricing(tx);
 
     const ids = new Map<string, string>();
     for (const u of SEED_USERS) {

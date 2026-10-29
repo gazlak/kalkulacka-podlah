@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { users } from "../db/schema";
-import { acceptInvite, checkToken, login, register, requestReset, resendVerify, resetPassword, userBySession, verifyEmail } from "./auth";
+import { acceptInvite, bootstrapAdmin, checkToken, login, register, requestReset, resendVerify, resetPassword, userBySession, verifyEmail } from "./auth";
 import { draftCalc, duplicateCalc, finalizeCalc, getCalc, listCalcs, recalcCalc, saveCalc, sendCalc, setCalcStatus } from "./calculations";
 import { storeDataUrl } from "./files";
 import { currentPricing, updateRates } from "./pricing";
@@ -204,6 +204,25 @@ describe("registrace a ověření e-mailu", () => {
     await resendVerify(t, "novak@demo.cz");
     await tick();
     expect(t.mailer.sent.length).toBe(before);
+  });
+});
+
+describe("první admin ostré instance", () => {
+  it("dokud admin není, založí pozvaného admina a pošle pozvánku; jakmile je, nic nedělá", async () => {
+    expect(await bootstrapAdmin(t, "sef@firma.cz")).toBeNull(); // seed má admina
+    await t.db.update(users).set({ role: "user" }).where(eq(users.email, "admin@demo.cz"));
+    try {
+      const r = await bootstrapAdmin(t, " Sef@Firma.cz ");
+      expect(r).toEqual({ email: "sef@firma.cz", link: null });
+      await new Promise((res) => setTimeout(res, 50));
+      const token = /\/invite\/([\w-]+)/.exec(t.mailer.sent.at(-1)!.text)![1];
+      await acceptInvite(t.db, token, "sefovoHeslo1", "Šéf");
+      expect((await login(t.db, { email: "sef@firma.cz", password: "sefovoHeslo1", remember: false })).result)
+        .toMatchObject({ ok: true, user: { role: "admin" } });
+      expect(await bootstrapAdmin(t, "jiny@firma.cz")).toBeNull();
+    } finally {
+      await t.db.update(users).set({ role: "admin" }).where(eq(users.email, "admin@demo.cz"));
+    }
   });
 });
 
