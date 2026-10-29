@@ -519,6 +519,45 @@ body.has-bar #toast { bottom: calc(var(--bar-h, 130px) + var(--s-3)); }
 .demo-chips .chip { height: auto; min-height: var(--h-chip); padding: var(--s-1) var(--s-3); flex-wrap: wrap; text-align: left; white-space: normal; position: relative; }
 .demo-chips .chip::after { inset: -4px 0; }
 
+/* přihlášení napůl (návrh ve stylu cuebi) */
+main.split { max-width: none; padding: 0; margin: 0; }
+.split-wrap { display: grid; grid-template-columns: minmax(0, 1fr); min-height: calc(100dvh - 28px); }
+.split-form { display: flex; flex-direction: column; padding: var(--s-5) var(--s-4) var(--s-6); }
+.split-form .split-logo { height: 32px; align-self: flex-start; }
+.split-form .auth { width: 100%; max-width: 400px; margin: auto; padding: var(--s-6) 0; }
+.auth-head { margin-bottom: var(--s-5); }
+.auth-head h1 { font-family: var(--font-tab); font-size: var(--fs-2xl); font-weight: 600; letter-spacing: -.02em; line-height: 1.1; margin: 0 0 var(--s-2); }
+.auth-head p { margin: 0; color: var(--muted); }
+.split-form .auth > .card:not(.demo-accounts) { background: none; border: 0; box-shadow: none; padding: 0; }
+.split-form .auth input[type=email], .split-form .auth input[type=password] { height: 48px; }
+.split-form .auth-alt { text-align: left; margin: var(--s-4) 0; }
+.split-glow { display: none; }
+@media (min-width: 860px) {
+  .split-wrap { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .split-form { padding: var(--s-6) var(--s-8); }
+  .split-glow { display: block; position: relative; overflow: hidden; isolation: isolate; margin: 12px; border-radius: 16px; background: #071229; }
+  .split-glow i { position: absolute; border-radius: 50%; filter: blur(70px); opacity: .85; z-index: -1; }
+  .split-glow i:nth-child(1) { width: 62%; aspect-ratio: 1; left: -14%; top: -10%; background: #1f4790; animation: kp-drift-1 13s ease-in-out infinite alternate; }
+  .split-glow i:nth-child(2) { width: 44%; aspect-ratio: 1; right: -8%; top: 28%; background: #3b7be0; opacity: .6; animation: kp-drift-2 17s ease-in-out infinite alternate; }
+  .split-glow i:nth-child(3) { width: 52%; aspect-ratio: 1; left: 18%; bottom: -24%; background: #0e2a5c; animation: kp-drift-3 11s ease-in-out infinite alternate; }
+  .split-glow i:nth-child(4) { width: 22%; aspect-ratio: 1; right: 22%; bottom: 14%; background: #c98a2b; opacity: .45; animation: kp-drift-4 15s ease-in-out infinite alternate; }
+  .glow-mark { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s-4); }
+  .glow-mark img { width: min(56%, 300px); height: auto; }
+  .glow-mark p { margin: 0; font-family: var(--font-tab); color: rgb(255 255 255 / .72); font-size: var(--fs-lg); letter-spacing: .01em; }
+}
+@media (min-width: 860px) {
+  .split-glow.has-photo .glow-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: -3; filter: grayscale(1) contrast(1.05) brightness(.95); }
+  .split-glow.has-photo::before { content: ""; position: absolute; inset: 0; z-index: -2; background: #1f4790; mix-blend-mode: multiply; }
+  .split-glow.has-photo::after { content: ""; position: absolute; inset: 0; z-index: -1; background: radial-gradient(ellipse 55% 30% at 50% 50%, rgb(7 18 41 / .55), transparent 70%), linear-gradient(180deg, rgb(7 18 41 / .15) 0%, rgb(7 18 41 / .55) 100%); }
+  .split-glow.has-photo i { z-index: 0; mix-blend-mode: screen; opacity: .35; }
+  .split-glow.has-photo .glow-mark { z-index: 1; }
+}
+@keyframes kp-drift-1 { to { transform: translate(14%, 10%) scale(1.08); } }
+@keyframes kp-drift-2 { to { transform: translate(-18%, 12%) scale(.92); } }
+@keyframes kp-drift-3 { to { transform: translate(10%, -14%) scale(1.1); } }
+@keyframes kp-drift-4 { to { transform: translate(-30%, -20%) scale(1.25); } }
+@media (prefers-reduced-motion: reduce) { .split-glow i { animation: none; } }
+
 /* PDF náhled */
 .pdf-wrap { background: var(--surface-2); margin: calc(var(--s-5) * -1) calc(var(--s-4) * -1) 0; padding: var(--s-4) var(--s-2); }
 .pdf-sheet { background: #fff; color: #1a1d24; max-width: 794px; margin: 0 auto; padding: var(--s-5) var(--s-4); box-shadow: 0 2px 12px oklch(0% 0 0 / .25); font-size: .9rem; line-height: 1.5; overflow: hidden; }
